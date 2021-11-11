@@ -19,8 +19,11 @@ import "./libraries/LatteConversion.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/IFlashLiquidateStrategy.sol";
 import "./interfaces/IClerk.sol";
+import "./interfaces/IFlatMarketConfig.sol";
 
 import "./FLAT.sol";
+
+import "hardhat/console.sol";
 
 /// @title FlatMarket - A place where fellow baristas come and get their FLAT.
 // solhint-disable avoid-low-level-calls
@@ -44,7 +47,6 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   /// These configurations are expected to be the same amongs markets.
   IClerk public clerk;
   IERC20Upgradeable public flat;
-  address public feeTo;
 
   /// @dev Market configuration states.
   IERC20Upgradeable public collateral;
@@ -66,17 +68,13 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   /// @dev Interest-related states
   uint256 public lastAccrueTime;
   uint256 public surplus;
-  uint256 public interestPerSecond;
 
   /// @dev Fee & Risk parameters
-  uint256 public maxCollateralRatio;
-  uint256 private constant COLLATERIZATION_RATE_PRECISION = 1e5; // Must be less than EXCHANGE_RATE_PRECISION (due to optimization in math)
+  IFlatMerketConfig public marketConfig;
 
-  uint256 private constant EXCHANGE_RATE_PRECISION = 1e18;
-
-  uint256 public liquidationMultiplier;
-  uint256 private constant LIQUIDATION_MULTIPLIER_PRECISION = 1e5;
-
+  uint256 private constant COLLATERIZATION_RATE_PRECISION = 1e4;
+  uint256 private constant COLLATERAL_PRICE_PRECISION = 1e18;
+  uint256 private constant LIQUIDATION_MULTIPLIER_PRECISION = 1e4;
   uint256 private constant DISTRIBUTION_PART = 10;
   uint256 private constant DISTRIBUTION_PRECISION = 100;
 
@@ -86,12 +84,9 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     IClerk _clerk,
     IERC20Upgradeable _flat,
     IERC20Upgradeable _collateral,
+    IFlatMerketConfig _marketConfig,
     IOracle _oracle,
-    bytes calldata _oracleData,
-    uint256 _interestPerSecond,
-    uint256 _liqudationMultiplier,
-    uint256 _maxCollateralRatio,
-    address _feeTo
+    bytes calldata _oracleData
   ) external initializer {
     OwnableUpgradeable.__Ownable_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
@@ -99,12 +94,9 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     clerk = _clerk;
     flat = _flat;
     collateral = _collateral;
+    marketConfig = _marketConfig;
     oracle = _oracle;
     oracleData = _oracleData;
-    interestPerSecond = _interestPerSecond;
-    liquidationMultiplier = _liqudationMultiplier;
-    maxCollateralRatio = _maxCollateralRatio;
-    feeTo = _feeTo;
   }
 
   /// @notice Accrue interest and realized surplus.
@@ -118,7 +110,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
       // 2. If totalDebtValue > 0 then calculate interest
       if (totalDebtValue > 0) {
         // 3. Calculate interest
-        uint256 _pendingInterest = (interestPerSecond * totalDebtValue * _timePast) / 1e18;
+        uint256 _pendingInterest = (marketConfig.interestPerSecond(address(this)) * totalDebtValue * _timePast) / 1e18;
         totalDebtValue = totalDebtValue + _pendingInterest;
 
         // 4. Realized surplus
@@ -247,6 +239,10 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   /// @param _user The address to check if it is safe from liquidation.
   /// @param _collateralPrice The exchange rate. Used to cache the `exchangeRate` between calls.
   function _checkSafe(address _user, uint256 _collateralPrice) internal view returns (bool) {
+    uint256 _maxCollateralRatio = marketConfig.maxCollateralRatio(address(this), _user);
+
+    require(_maxCollateralRatio >= 5000, "bad maxCollateralRatio");
+
     uint256 _userDebtShare = userDebtShare[_user];
     if (_userDebtShare == 0) return true;
     uint256 _userCollateralShare = userCollateralShare[_user];
@@ -255,7 +251,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     return
       clerk.toAmount(
         collateral,
-        _userCollateralShare * (EXCHANGE_RATE_PRECISION / COLLATERIZATION_RATE_PRECISION) * maxCollateralRatio,
+        _userCollateralShare * (COLLATERAL_PRICE_PRECISION / COLLATERIZATION_RATE_PRECISION) * _maxCollateralRatio,
         false
       ) >= (_userDebtShare * totalDebtValue * _collateralPrice) / totalDebtShare;
   }
@@ -336,36 +332,38 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   }
 
   /// @notice Repays a loan.
-  /// @param _to Address of the user this payment should go.
+  /// @param _for Address of the user this payment should go.
   /// @param _maxDebtReturn The maxium amount of FLAT to be return.
   /// @param _minPrice The minimum price to prevent slippage
   /// @param _maxPrice The maximum price to prevent slippage
   function depositAndRepay(
-    address _to,
+    address _for,
     uint256 _maxDebtReturn,
     uint256 _minPrice,
     uint256 _maxPrice
   ) external nonReentrant accrue updateCollateralPriceWithSlippageCheck(_minPrice, _maxPrice) returns (uint256) {
     // 1. Find out how much debt to repaid
-    uint256 _debtValue = MathUpgradeable.min(_maxDebtReturn, debtShareToValue(userDebtShare[_to], true));
+    uint256 _debtValue = MathUpgradeable.min(_maxDebtReturn, debtShareToValue(userDebtShare[_for], true));
 
     // 2. Deposit FLAT to Clerk
     _vaultDeposit(flat, msg.sender, _debtValue, 0);
 
     // 3. Repay debt
-    _repay(_to, _debtValue);
+    _repay(_for, _debtValue);
 
     return _debtValue;
   }
 
   /// @notice Deposit "_debtValue" FLAT to the vault, repay the debt, and withdraw "_collateralAmount" of collateral.
   /// @dev source of funds to repay debt will come from msg.sender, "_to" is beneficiary
-  /// @param _to The address to repay debt.
+  /// @param _for The address to repay debt for.
+  /// @param _to The address to received collateral token.
   /// @param _maxDebtReturn The maxium amount of FLAT to be return.
   /// @param _collateralAmount The amount of collateral to be withdrawn.
   /// @param _minPrice Minimum price to allow the repayment.
   /// @param _maxPrice Maximum price to allow the replayment.
   function depositRepayAndWithdraw(
+    address _for,
     address _to,
     uint256 _maxDebtReturn,
     uint256 _collateralAmount,
@@ -379,7 +377,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     _vaultDeposit(flat, msg.sender, _debtValue, 0);
 
     // 3. Repay the debt
-    _repay(_to, _debtValue);
+    _repay(_for, _debtValue);
 
     // 4. Remove collateral from FlatMarket to "_to"
     uint256 _collateralShare = clerk.toShare(collateral, _collateralAmount, false);
@@ -399,6 +397,10 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     address _to,
     IFlashLiquidateStrategy _flashLiquidateStrategy
   ) public nonReentrant accrue {
+    // 1. Load required config
+    uint256 _liquidationMultiplier = marketConfig.liquidationMultiplier(address(this));
+    require(_liquidationMultiplier > 0, "bad liquidation multiplier");
+
     // 2. Force update collateral price
     (, uint256 _collateralPrice) = updateCollateralPrice();
 
@@ -417,8 +419,8 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         }
         uint256 _borrowAmount = debtShareToValue(_debtShare, false);
         uint256 _collateralShare = _flatVaultTotals.toShare(
-          (_borrowAmount * liquidationMultiplier * _collateralPrice) /
-            (LIQUIDATION_MULTIPLIER_PRECISION * EXCHANGE_RATE_PRECISION),
+          (_borrowAmount * _liquidationMultiplier * _collateralPrice) /
+            (LIQUIDATION_MULTIPLIER_PRECISION * COLLATERAL_PRICE_PRECISION),
           false
         );
 
@@ -440,7 +442,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     totalCollateralShare = totalCollateralShare - _allCollateralShare;
 
     {
-      uint256 _distributionAmount = ((((_allBorrowAmount * liquidationMultiplier) / LIQUIDATION_MULTIPLIER_PRECISION) -
+      uint256 _distributionAmount = ((((_allBorrowAmount * _liquidationMultiplier) / LIQUIDATION_MULTIPLIER_PRECISION) -
         _allBorrowAmount) * DISTRIBUTION_PART) / DISTRIBUTION_PRECISION; // Distribution Amount
       _allBorrowAmount = _allBorrowAmount + _distributionAmount;
       surplus = surplus + _distributionAmount;
@@ -491,9 +493,8 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     _removeCollateral(_to, _share);
   }
 
-  /// @notice Repays a loan and withdraw collateral
-  /// @dev source of funds to repay debt will come from msg.sender, "_to" is beneficiary
-  /// @param _to The address to repay debt.
+  /// @notice Remove and withdraw collateral from Clerk.
+  /// @param _to The address to receive token.
   /// @param _collateralAmount The amount of collateral to be withdrawn.
   /// @param _minPrice Minimum price to allow the repayment.
   /// @param _maxPrice Maximum price to allow the replayment.
@@ -505,21 +506,21 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   ) external nonReentrant accrue updateCollateralPriceWithSlippageCheck(_minPrice, _maxPrice) checkSafe {
     // 1. Remove collateral from FlatMarket to "_to"
     uint256 _collateralShare = clerk.toShare(collateral, _collateralAmount, false);
-    _removeCollateral(_to, _collateralShare);
+    _removeCollateral(msg.sender, _collateralShare);
 
     // 2. Withdraw collateral to "_to"
     _vaultWithdraw(collateral, _to, _collateralAmount, 0);
   }
 
   /// @notice Perform the actual repay.
-  /// @param _to The address to repay debt.
+  /// @param _for The address to repay debt.
   /// @param _debtValue The debt value to be repaid.
-  function _repay(address _to, uint256 _debtValue) internal returns (uint256 _debtShare) {
+  function _repay(address _for, uint256 _debtValue) internal returns (uint256 _debtShare) {
     // 1. Findout "_debtShare" from the given "_debtValue"
     _debtShare = debtValueToShare(_debtValue, false);
 
     // 2. Update user's debtShare
-    userDebtShare[_to] = userDebtShare[_to] - _debtShare;
+    userDebtShare[_for] = userDebtShare[_for] - _debtShare;
 
     // 3. Update total debtShare and debtValue
     totalDebtShare = totalDebtShare - _debtShare;
@@ -529,39 +530,23 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     uint256 _share = clerk.toShare(flat, _debtValue, true);
     clerk.transfer(flat, msg.sender, address(this), _share);
 
-    emit LogRepay(msg.sender, _to, _debtValue, _debtShare);
+    emit LogRepay(msg.sender, _for, _debtValue, _debtShare);
   }
 
   /// @notice Repays a loan.
-  /// @param _to Address of the user this payment should go.
+  /// @param _for Address of the user this payment should go.
   /// @param _maxDebtValue The maximum amount of FLAT to be repaid.
   /// @param _minPrice The minimum price to prevent slippage
   /// @param _maxPrice The maximum price to prevent slippage
   function repay(
-    address _to,
+    address _for,
     uint256 _maxDebtValue,
     uint256 _minPrice,
     uint256 _maxPrice
   ) external nonReentrant accrue updateCollateralPriceWithSlippageCheck(_minPrice, _maxPrice) returns (uint256) {
-    uint256 _debtValue = MathUpgradeable.min(_maxDebtValue, debtShareToValue(userDebtShare[_to], true));
-    _repay(_to, _debtValue);
+    uint256 _debtValue = MathUpgradeable.min(_maxDebtValue, debtShareToValue(userDebtShare[_for], true));
+    _repay(_for, _debtValue);
     return _debtValue;
-  }
-
-  /// @notice Sets the beneficiary of interest accrued.
-  /// @param _newFeeTo The address of the receiver.
-  function setFeeTo(address _newFeeTo) public onlyOwner {
-    feeTo = _newFeeTo;
-    emit LogFeeTo(_newFeeTo);
-  }
-
-  /// @notice Set interest rate.
-  /// @dev Accrue interest with previous rate then update interestPerSecond.
-  /// @param _newInterestPerSecond The new interest per second.
-  function setInterestPerSecond(uint256 _newInterestPerSecond) external accrue onlyOwner {
-    uint256 _oldinterestPerSecond = interestPerSecond;
-    interestPerSecond = _newInterestPerSecond;
-    emit LogSetInterestPerSec(_oldinterestPerSecond, _newInterestPerSecond);
   }
 
   /// @notice Update collateral price from Oracle.
@@ -606,24 +591,33 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   }
 
   /// @notice Withdraw collateral from the Clerk.
+  /// @param _token The token to be withdrawn.
   /// @param _to The address of the receiver.
   /// @param _collateralAmount The amount to be withdrawn.
-  function withdraw(address _to, uint256 _collateralAmount) external accrue {
-    _vaultWithdraw(collateral, _to, _collateralAmount, 0);
+  function withdraw(
+    IERC20Upgradeable _token,
+    address _to,
+    uint256 _collateralAmount
+  ) external accrue {
+    _vaultWithdraw(_token, _to, _collateralAmount, 0);
   }
 
   /// @notice Withdraws accumulated surplus.
   function withdrawSurplus() external accrue {
-    // 1. Cached old surplus
+    // 1. Load required config
+    address _feeTreasury = marketConfig.feeTreasury();
+    require(_feeTreasury != address(0), "bad feeTreasury");
+
+    // 2. Cached old surplus
     uint256 _surplus = surplus;
 
-    // 2. Update surplus and calculate _share to be transferred
+    // 3. Update surplus and calculate _share to be transferred
     uint256 _share = clerk.toShare(flat, surplus, false);
     surplus = 0;
 
-    // 3. Perform the actual transfer
-    clerk.transfer(flat, address(this), feeTo, _share);
+    // 4. Perform the actual transfer
+    clerk.transfer(flat, address(this), _feeTreasury, _share);
 
-    emit LogWithdrawSurplus(feeTo, _surplus);
+    emit LogWithdrawSurplus(_feeTreasury, _surplus);
   }
 }

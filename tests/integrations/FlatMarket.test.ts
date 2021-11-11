@@ -9,6 +9,8 @@ import {
   CompositeOracle__factory,
   FLAT,
   FlatMarket,
+  FlatMarketConfig,
+  FlatMarketConfig__factory,
   FlatMarket__factory,
   FLAT__factory,
   OffChainOracle,
@@ -32,8 +34,9 @@ chai.use(solidity);
 const { expect } = chai;
 
 describe("FlatMarket", () => {
-  const MAX_COLLATERAL_RATIO = "85000";
-  const INTEREST_PER_SECONDS = ethers.utils.parseEther("0.005").div(365 * 24 * 60 * 60);
+  const LIQUIDATION_MULTIPLIER = "10500";
+  const MAX_COLLATERAL_RATIO = "8500";
+  const INTEREST_PER_SECOND = ethers.utils.parseEther("0.005").div(365 * 24 * 60 * 60);
 
   // Accounts
   let deployer: Signer;
@@ -65,6 +68,7 @@ describe("FlatMarket", () => {
   let clerk: Clerk;
 
   let usdcUsdtLpMarket: FlatMarket;
+  let flatMarketConfig: FlatMarketConfig;
 
   // contract account
   let flatAsAlice: FLAT;
@@ -177,6 +181,15 @@ describe("FlatMarket", () => {
     const FLAT = (await ethers.getContractFactory("FLAT", deployer)) as FLAT__factory;
     flat = await FLAT.deploy();
 
+    // Deploy MarketConfig
+    const FlatMarketConfig = (await ethers.getContractFactory(
+      "FlatMarketConfig",
+      deployer
+    )) as FlatMarketConfig__factory;
+    flatMarketConfig = (await upgrades.deployProxy(FlatMarketConfig, [deployerAddress])) as FlatMarketConfig;
+
+    expect(await flatMarketConfig.feeTreasury()).to.be.eq(deployerAddress);
+
     // Deploy usdcUsdtLpMarket
     // Assuming 0.5% interest rate per year
     // Assuming 85% collateralization ratio
@@ -185,12 +198,9 @@ describe("FlatMarket", () => {
       clerk.address,
       flat.address,
       usdcUsdtLp.address,
+      flatMarketConfig.address,
       compositOracle.address,
       ethers.utils.defaultAbiCoder.encode(["address"], [usdcUsdtLp.address]),
-      INTEREST_PER_SECONDS,
-      "105000",
-      MAX_COLLATERAL_RATIO,
-      deployerAddress,
     ])) as FlatMarket;
 
     // Whitelist market to allow market to access funds in Clerk
@@ -198,6 +208,30 @@ describe("FlatMarket", () => {
 
     // Mint FLAT to usdcUsdtLpMarket
     await flat.mintToClerk(usdcUsdtLpMarket.address, ethers.utils.parseEther("168168168168168"), clerk.address);
+
+    // Assuming someone try to borrow FLAT from usdcUsdtLpMarket when it is not setup yet
+    await usdcUsdtLp.approve(clerk.address, ethers.constants.MaxUint256);
+    await expect(
+      usdcUsdtLpMarket.depositAndBorrow(
+        deployerAddress,
+        ethers.utils.parseEther("10000000"),
+        ethers.utils.parseEther("8500000"),
+        ethers.utils.parseEther("1"),
+        ethers.utils.parseEther("1")
+      )
+    ).to.be.revertedWith("bad maxCollateralRatio");
+
+    // Config market
+    await flatMarketConfig.setConfig(
+      [usdcUsdtLpMarket.address],
+      [
+        {
+          maxCollateralRatio: MAX_COLLATERAL_RATIO,
+          liquidationMultiplier: LIQUIDATION_MULTIPLIER,
+          interestPerSecond: INTEREST_PER_SECOND,
+        },
+      ]
+    );
 
     // Connect contracts to Alice
     usdcUsdtLpAsAlice = SimpleToken__factory.connect(usdcUsdtLp.address, alice);
@@ -233,11 +267,13 @@ describe("FlatMarket", () => {
       expect(await usdcUsdtLpMarket.oracleData()).to.equal(
         ethers.utils.defaultAbiCoder.encode(["address"], [usdcUsdtLp.address])
       );
-      expect(await usdcUsdtLpMarket.interestPerSecond()).to.equal(
+      expect(await flatMarketConfig.interestPerSecond(usdcUsdtLpMarket.address)).to.equal(
         ethers.utils.parseEther("0.005").div(365 * 24 * 60 * 60)
       );
-      expect(await usdcUsdtLpMarket.maxCollateralRatio()).to.equal("85000");
-      expect(await usdcUsdtLpMarket.liquidationMultiplier()).to.equal("105000");
+      expect(await flatMarketConfig.maxCollateralRatio(usdcUsdtLpMarket.address, deployerAddress)).to.equal(
+        MAX_COLLATERAL_RATIO
+      );
+      expect(await flatMarketConfig.liquidationMultiplier(usdcUsdtLpMarket.address)).to.equal(LIQUIDATION_MULTIPLIER);
     });
   });
 
@@ -278,7 +314,7 @@ describe("FlatMarket", () => {
       stages["accrue"] = [await timeHelpers.latestTimestamp(), await timeHelpers.latestBlockNumber()];
 
       const timePast = stages["accrue"][0].sub(stages["aliceBorrow"][0]);
-      const expectedSurplus = borrowAmount.mul(timePast).mul(INTEREST_PER_SECONDS).div(ethers.constants.WeiPerEther);
+      const expectedSurplus = borrowAmount.mul(timePast).mul(INTEREST_PER_SECOND).div(ethers.constants.WeiPerEther);
       expect(await usdcUsdtLpMarket.lastAccrueTime()).to.be.eq(stages["accrue"][0]);
       expect(await usdcUsdtLpMarket.surplus()).to.be.eq(expectedSurplus);
       expect(await usdcUsdtLpMarket.totalDebtShare()).to.be.eq(borrowAmount);
@@ -417,7 +453,7 @@ describe("FlatMarket", () => {
     context("when Alice borrows to her account", async () => {
       context("when she borrows more than MAX_COLLATERAL_RATIO", async () => {
         it("should revert", async () => {
-          const borrowAmount = collateralAmount.mul(MAX_COLLATERAL_RATIO).div(100000).add(1);
+          const borrowAmount = collateralAmount.mul(MAX_COLLATERAL_RATIO).div(10000).add(1);
 
           // Alice borrow
           await expect(
@@ -477,7 +513,7 @@ describe("FlatMarket", () => {
 
       context("when she borrows MAX_COLLATERAL_RATIO of her collateral", async () => {
         it("should work", async () => {
-          const borrowAmount = collateralAmount.mul(MAX_COLLATERAL_RATIO).div(100000);
+          const borrowAmount = collateralAmount.mul(MAX_COLLATERAL_RATIO).div(10000);
 
           // Alice borrow
           const lastAccrueTime = await usdcUsdtLpMarket.lastAccrueTime();
@@ -506,7 +542,7 @@ describe("FlatMarket", () => {
     context("when Alice borrows to Bob account", async () => {
       context("when she borrows more than MAX_COLLATERAL_RATIO", async () => {
         it("should revert", async () => {
-          const borrowAmount = collateralAmount.mul(MAX_COLLATERAL_RATIO).div(100000).add(1);
+          const borrowAmount = collateralAmount.mul(MAX_COLLATERAL_RATIO).div(10000).add(1);
 
           // Alice borrow to Bob account
           await expect(
@@ -571,7 +607,7 @@ describe("FlatMarket", () => {
 
       context("when she borrows MAX_COLLATERAL_RATIO of her collateral", async () => {
         it("should work", async () => {
-          const borrowAmount = collateralAmount.mul(MAX_COLLATERAL_RATIO).div(100000);
+          const borrowAmount = collateralAmount.mul(MAX_COLLATERAL_RATIO).div(10000);
 
           // Alice borrow to Bob account
           const lastAccrueTime = await usdcUsdtLpMarket.lastAccrueTime();
@@ -842,7 +878,7 @@ describe("FlatMarket", () => {
               stages["aliceDepositAndBorrow"][0],
               stages["aliceDepositAndRepay"][0],
               totalDebtValue,
-              INTEREST_PER_SECONDS
+              INTEREST_PER_SECOND
             )
           );
 
@@ -881,7 +917,7 @@ describe("FlatMarket", () => {
           stages["aliceDepositAndBorrow"][0],
           stages["bobDepositAndBorrow"][0],
           totalDebtValue,
-          INTEREST_PER_SECONDS
+          INTEREST_PER_SECOND
         );
         totalDebtValue = totalDebtValue.add(accruedInterest);
 
@@ -930,7 +966,7 @@ describe("FlatMarket", () => {
               stages["bobDepositAndBorrow"][0],
               stages["bobRepay"][0],
               totalDebtValue,
-              INTEREST_PER_SECONDS
+              INTEREST_PER_SECOND
             )
           );
 
@@ -982,7 +1018,7 @@ describe("FlatMarket", () => {
               stages["bobDepositAndBorrow"][0],
               stages["bobRepay"][0],
               totalDebtValue,
-              INTEREST_PER_SECONDS
+              INTEREST_PER_SECOND
             )
           );
 
@@ -1026,11 +1062,12 @@ describe("FlatMarket", () => {
     });
 
     context("when Alice has no debt", async () => {
-      context("when '_to' is her account", async () => {
+      context("when '_for' & '_to' is her account", async () => {
         context("when she remove collateral more than she has", async () => {
           it("should revert", async () => {
             await expect(
               usdcUsdtLpMarketAsAlice.depositRepayAndWithdraw(
+                aliceAddress,
                 aliceAddress,
                 ethers.constants.MaxUint256,
                 collateralAmount.add(1),
@@ -1045,6 +1082,7 @@ describe("FlatMarket", () => {
           it("should work", async () => {
             const aliceUsdcUsdtLpBefore = await usdcUsdtLp.balanceOf(aliceAddress);
             await usdcUsdtLpMarketAsAlice.depositRepayAndWithdraw(
+              aliceAddress,
               aliceAddress,
               ethers.constants.MaxUint256,
               collateralAmount,
@@ -1063,11 +1101,12 @@ describe("FlatMarket", () => {
         });
       });
 
-      context("when '_to' is Bob account", async () => {
+      context("when '_for' & '_to' is Bob account", async () => {
         context("when she remove collateral more than she has", async () => {
           it("should revert", async () => {
             await expect(
               usdcUsdtLpMarketAsAlice.depositRepayAndWithdraw(
+                bobAddress,
                 bobAddress,
                 ethers.constants.MaxUint256,
                 collateralAmount.add(1),
@@ -1082,6 +1121,7 @@ describe("FlatMarket", () => {
           it("should work", async () => {
             const bobUsdcUsdtLpBefore = await usdcUsdtLp.balanceOf(bobAddress);
             await usdcUsdtLpMarketAsAlice.depositRepayAndWithdraw(
+              bobAddress,
               bobAddress,
               ethers.constants.MaxUint256,
               collateralAmount,
@@ -1104,12 +1144,21 @@ describe("FlatMarket", () => {
 
     context("when Alice has debt", async () => {
       const borrowAmount = collateralAmount.div(2);
-      const aliceMinCollateral = borrowAmount.mul(100000).div(MAX_COLLATERAL_RATIO);
+      const aliceMinCollateral = borrowAmount.mul(10000).div(MAX_COLLATERAL_RATIO);
       const canRemoveCollateral = collateralAmount.sub(aliceMinCollateral);
 
       beforeEach(async () => {
         // Turn off interest before borrow
-        await usdcUsdtLpMarket.setInterestPerSecond(0);
+        await flatMarketConfig.setConfig(
+          [usdcUsdtLpMarket.address],
+          [
+            {
+              maxCollateralRatio: MAX_COLLATERAL_RATIO,
+              liquidationMultiplier: LIQUIDATION_MULTIPLIER,
+              interestPerSecond: 0,
+            },
+          ]
+        );
 
         await usdcUsdtLpMarketAsAlice.borrowAndWithdraw(
           aliceAddress,
@@ -1124,7 +1173,7 @@ describe("FlatMarket", () => {
         expect(await flat.balanceOf(aliceAddress)).to.be.eq(borrowAmount);
       });
 
-      context("when '_to' is her account", async () => {
+      context("when '_for' & '_to' is her account", async () => {
         context("when she not return any debt", async () => {
           context(
             "when her position went over MAX_COLLATERAL_RATIO after she does depositRepayAndWithdraw",
@@ -1132,6 +1181,7 @@ describe("FlatMarket", () => {
               it("should revert", async () => {
                 await expect(
                   usdcUsdtLpMarketAsAlice.depositRepayAndWithdraw(
+                    aliceAddress,
                     aliceAddress,
                     "0",
                     canRemoveCollateral.add(1),
@@ -1150,6 +1200,7 @@ describe("FlatMarket", () => {
 
               const aliceUsdcUsdtLpBefore = await usdcUsdtLp.balanceOf(aliceAddress);
               await usdcUsdtLpMarketAsAlice.depositRepayAndWithdraw(
+                aliceAddress,
                 aliceAddress,
                 "0",
                 removeCollateral,
@@ -1172,6 +1223,10 @@ describe("FlatMarket", () => {
         });
 
         context("when she return debt", async () => {
+          const returnAmount = ethers.BigNumber.from("1");
+          const aliceMinCollateralIfReturn = borrowAmount.sub(returnAmount).mul(10000).div(MAX_COLLATERAL_RATIO);
+          const aliceCanRemoveCollateralIfReturn = collateralAmount.sub(aliceMinCollateralIfReturn);
+
           context(
             "when her position went over MAX_COLLATERAL_RATIO after she does depositRepayAndWithdraw",
             async () => {
@@ -1179,8 +1234,9 @@ describe("FlatMarket", () => {
                 await expect(
                   usdcUsdtLpMarketAsAlice.depositRepayAndWithdraw(
                     aliceAddress,
-                    "1",
-                    canRemoveCollateral.sub(1),
+                    aliceAddress,
+                    returnAmount,
+                    aliceCanRemoveCollateralIfReturn,
                     ethers.utils.parseEther("1"),
                     ethers.utils.parseEther("1")
                   )
@@ -1188,6 +1244,289 @@ describe("FlatMarket", () => {
               });
             }
           );
+
+          context("when her position still safe after she does depositRepayAndWithdraw", async () => {
+            it("should work", async () => {
+              // removeCollateral = canRemoveCollateral - 3 wei to margin rounding error
+              const removeCollateral = aliceCanRemoveCollateralIfReturn.sub(3);
+
+              const aliceUsdcUsdtLpBefore = await usdcUsdtLp.balanceOf(aliceAddress);
+              await usdcUsdtLpMarketAsAlice.depositRepayAndWithdraw(
+                aliceAddress,
+                aliceAddress,
+                "0",
+                removeCollateral,
+                ethers.utils.parseEther("1"),
+                ethers.utils.parseEther("1")
+              );
+              const aliceUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(aliceAddress);
+
+              expect(aliceUsdcUsdtLpAfter.sub(aliceUsdcUsdtLpBefore)).to.be.eq(removeCollateral);
+              expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
+                collateralAmount.sub(removeCollateral)
+              );
+              expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
+              expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount.sub(removeCollateral));
+              expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(
+                collateralAmount.sub(removeCollateral)
+              );
+            });
+          });
+        });
+      });
+
+      context("when '_for' & '_to' is Bob account", async () => {
+        context("when she not return any debt for Bob", async () => {
+          context(
+            "when her position went over MAX_COLLATERAL_RATIO after she does depositRepayAndWithdraw",
+            async () => {
+              it("should revert", async () => {
+                await expect(
+                  usdcUsdtLpMarketAsAlice.depositRepayAndWithdraw(
+                    bobAddress,
+                    bobAddress,
+                    "0",
+                    canRemoveCollateral.add(1),
+                    ethers.utils.parseEther("1"),
+                    ethers.utils.parseEther("1")
+                  )
+                ).to.be.revertedWith("!safe");
+              });
+            }
+          );
+
+          context("when her position still safe after she does depositRepayAndWithdraw", async () => {
+            it("should work", async () => {
+              // removeCollateral = canRemoveCollateral - 1 wei to round down
+              const removeCollateral = canRemoveCollateral.sub(1);
+
+              const aliceUsdcUsdtLpBefore = await usdcUsdtLp.balanceOf(aliceAddress);
+              const bobUsdcUsdtLpBefore = await usdcUsdtLp.balanceOf(bobAddress);
+              await usdcUsdtLpMarketAsAlice.depositRepayAndWithdraw(
+                bobAddress,
+                bobAddress,
+                "0",
+                removeCollateral,
+                ethers.utils.parseEther("1"),
+                ethers.utils.parseEther("1")
+              );
+              const aliceUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(aliceAddress);
+              const bobUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(bobAddress);
+
+              expect(aliceUsdcUsdtLpAfter.sub(aliceUsdcUsdtLpBefore)).to.be.eq(0);
+              expect(bobUsdcUsdtLpAfter.sub(bobUsdcUsdtLpBefore)).to.be.eq(removeCollateral);
+              expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
+                collateralAmount.sub(removeCollateral)
+              );
+              expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
+              expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount.sub(removeCollateral));
+              expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(
+                collateralAmount.sub(removeCollateral)
+              );
+            });
+          });
+        });
+
+        context("when she return debt", async () => {
+          const returnAmount = ethers.BigNumber.from("1");
+          const aliceMinCollateralIfReturn = borrowAmount.sub(returnAmount).mul(10000).div(MAX_COLLATERAL_RATIO);
+          const aliceCanRemoveCollateralIfReturn = collateralAmount.sub(aliceMinCollateralIfReturn);
+
+          context(
+            "when her position went over MAX_COLLATERAL_RATIO after she does depositRepayAndWithdraw",
+            async () => {
+              it("should revert", async () => {
+                await expect(
+                  usdcUsdtLpMarketAsAlice.depositRepayAndWithdraw(
+                    bobAddress,
+                    bobAddress,
+                    returnAmount,
+                    aliceCanRemoveCollateralIfReturn,
+                    ethers.utils.parseEther("1"),
+                    ethers.utils.parseEther("1")
+                  )
+                ).to.be.revertedWith("!safe");
+              });
+            }
+          );
+
+          context("when her position still safe after she does depositRepayAndWithdraw", async () => {
+            it("should work", async () => {
+              // removeCollateral = canRemoveCollateral - 1 wei to margin rounding error
+              const removeCollateral = aliceCanRemoveCollateralIfReturn.sub(3);
+
+              const aliceUsdcUsdtLpBefore = await usdcUsdtLp.balanceOf(aliceAddress);
+              const bobUsdcUsdtLpBefore = await usdcUsdtLp.balanceOf(bobAddress);
+              await usdcUsdtLpMarketAsAlice.depositRepayAndWithdraw(
+                bobAddress,
+                bobAddress,
+                returnAmount,
+                removeCollateral,
+                ethers.utils.parseEther("1"),
+                ethers.utils.parseEther("1")
+              );
+              const aliceUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(aliceAddress);
+              const bobUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(bobAddress);
+
+              expect(aliceUsdcUsdtLpAfter.sub(aliceUsdcUsdtLpBefore)).to.be.eq(0);
+              expect(bobUsdcUsdtLpAfter.sub(bobUsdcUsdtLpBefore)).to.be.eq(removeCollateral);
+              expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
+                collateralAmount.sub(removeCollateral)
+              );
+              expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
+              expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount.sub(removeCollateral));
+              expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(
+                collateralAmount.sub(removeCollateral)
+              );
+            });
+          });
+        });
+      });
+
+      context("when Bob has debt", async () => {
+        const borrowAmount = collateralAmount.div(2);
+
+        beforeEach(async () => {
+          // Turn off interest before borrow
+          await flatMarketConfig.setConfig(
+            [usdcUsdtLpMarket.address],
+            [
+              {
+                maxCollateralRatio: MAX_COLLATERAL_RATIO,
+                liquidationMultiplier: LIQUIDATION_MULTIPLIER,
+                interestPerSecond: 0,
+              },
+            ]
+          );
+
+          await usdcUsdtLpMarketAsBob.depositAndBorrow(
+            bobAddress,
+            collateralAmount,
+            borrowAmount,
+            ethers.utils.parseEther("1"),
+            ethers.utils.parseEther("1")
+          );
+
+          expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount.mul(2));
+          expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
+          expect(await usdcUsdtLpMarket.userCollateralShare(bobAddress)).to.be.eq(collateralAmount);
+          expect(await clerk.balanceOf(flat.address, aliceAddress)).to.be.eq(0);
+          expect(await flat.balanceOf(bobAddress)).to.be.eq(borrowAmount);
+        });
+
+        context("when Alice '_for' is Bob & '_to' is Alice", async () => {
+          context("when she not return any debt for Bob", async () => {
+            context(
+              "when her position went over MAX_COLLATERAL_RATIO after she does depositRepayAndWithdraw",
+              async () => {
+                it("should revert", async () => {
+                  await expect(
+                    usdcUsdtLpMarketAsAlice.depositRepayAndWithdraw(
+                      bobAddress,
+                      aliceAddress,
+                      "0",
+                      canRemoveCollateral.add(1),
+                      ethers.utils.parseEther("1"),
+                      ethers.utils.parseEther("1")
+                    )
+                  ).to.be.revertedWith("!safe");
+                });
+              }
+            );
+
+            context("when her position still safe after she does depositRepayAndWithdraw", async () => {
+              it("should work", async () => {
+                // removeCollateral = canRemoveCollateral - 1 wei to round down
+                const removeCollateral = canRemoveCollateral.sub(1);
+
+                const aliceUsdcUsdtLpBefore = await usdcUsdtLp.balanceOf(aliceAddress);
+                const bobUsdcUsdtLpBefore = await usdcUsdtLp.balanceOf(bobAddress);
+                await usdcUsdtLpMarketAsAlice.depositRepayAndWithdraw(
+                  bobAddress,
+                  aliceAddress,
+                  "0",
+                  removeCollateral,
+                  ethers.utils.parseEther("1"),
+                  ethers.utils.parseEther("1")
+                );
+                const aliceUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(aliceAddress);
+                const bobUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(bobAddress);
+
+                expect(aliceUsdcUsdtLpAfter.sub(aliceUsdcUsdtLpBefore)).to.be.eq(removeCollateral);
+                expect(bobUsdcUsdtLpAfter.sub(bobUsdcUsdtLpBefore)).to.be.eq(0);
+                expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
+                  collateralAmount.mul(2).sub(removeCollateral)
+                );
+                expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
+                expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(
+                  collateralAmount.mul(2).sub(removeCollateral)
+                );
+                expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(
+                  collateralAmount.sub(removeCollateral)
+                );
+              });
+            });
+          });
+
+          context("when she return debt", async () => {
+            const returnAmount = ethers.BigNumber.from("1");
+            const aliceMinCollateralIfReturn = borrowAmount.sub(returnAmount).mul(10000).div(MAX_COLLATERAL_RATIO);
+            const aliceCanRemoveCollateralIfReturn = collateralAmount.sub(aliceMinCollateralIfReturn);
+
+            context(
+              "when her position went over MAX_COLLATERAL_RATIO after she does depositRepayAndWithdraw",
+              async () => {
+                it("should revert", async () => {
+                  await expect(
+                    usdcUsdtLpMarketAsAlice.depositRepayAndWithdraw(
+                      bobAddress,
+                      aliceAddress,
+                      returnAmount,
+                      aliceCanRemoveCollateralIfReturn,
+                      ethers.utils.parseEther("1"),
+                      ethers.utils.parseEther("1")
+                    )
+                  ).to.be.revertedWith("!safe");
+                });
+              }
+            );
+
+            context("when her position still safe after she does depositRepayAndWithdraw", async () => {
+              it("should work", async () => {
+                // removeCollateral = canRemoveCollateral - 3 wei to margin rounding error
+                const removeCollateral = aliceCanRemoveCollateralIfReturn.sub(3);
+
+                const aliceUsdcUsdtLpBefore = await usdcUsdtLp.balanceOf(aliceAddress);
+                const bobUsdcUsdtLpBefore = await usdcUsdtLp.balanceOf(bobAddress);
+                const bobDebtShareBefore = await usdcUsdtLpMarket.userDebtShare(bobAddress);
+                await usdcUsdtLpMarketAsAlice.depositRepayAndWithdraw(
+                  bobAddress,
+                  aliceAddress,
+                  returnAmount,
+                  removeCollateral,
+                  ethers.utils.parseEther("1"),
+                  ethers.utils.parseEther("1")
+                );
+                const aliceUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(aliceAddress);
+                const bobUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(bobAddress);
+                const bobDebtShareAfter = await usdcUsdtLpMarket.userDebtShare(bobAddress);
+
+                expect(bobDebtShareAfter).to.be.lt(bobDebtShareBefore);
+                expect(aliceUsdcUsdtLpAfter.sub(aliceUsdcUsdtLpBefore)).to.be.eq(removeCollateral);
+                expect(bobUsdcUsdtLpAfter.sub(bobUsdcUsdtLpBefore)).to.be.eq(0);
+                expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
+                  collateralAmount.mul(2).sub(removeCollateral)
+                );
+                expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
+                expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(
+                  collateralAmount.mul(2).sub(removeCollateral)
+                );
+                expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(
+                  collateralAmount.sub(removeCollateral)
+                );
+              });
+            });
+          });
         });
       });
     });
@@ -1291,12 +1630,21 @@ describe("FlatMarket", () => {
 
     context("when Alice has debt", async () => {
       const borrowAmount = collateralAmount.div(2);
-      const aliceMinCollateral = borrowAmount.mul(100000).div(MAX_COLLATERAL_RATIO);
+      const aliceMinCollateral = borrowAmount.mul(10000).div(MAX_COLLATERAL_RATIO);
       const canRemoveCollateral = collateralAmount.sub(aliceMinCollateral);
 
       beforeEach(async () => {
         // Turn off interest before borrow
-        await usdcUsdtLpMarket.setInterestPerSecond(0);
+        await flatMarketConfig.setConfig(
+          [usdcUsdtLpMarket.address],
+          [
+            {
+              maxCollateralRatio: MAX_COLLATERAL_RATIO,
+              liquidationMultiplier: LIQUIDATION_MULTIPLIER,
+              interestPerSecond: 0,
+            },
+          ]
+        );
 
         await usdcUsdtLpMarketAsAlice.borrow(
           aliceAddress,
@@ -1397,6 +1745,225 @@ describe("FlatMarket", () => {
     });
   });
 
+  describe("#removeCollateralAndWithdraw", async () => {
+    const collateralAmount = ethers.utils.parseEther("10000000");
+
+    beforeEach(async () => {
+      const aliceUsdcUsdtLpBefore = await usdcUsdtLp.balanceOf(aliceAddress);
+      await usdcUsdtLpMarketAsAlice.deposit(usdcUsdtLp.address, aliceAddress, collateralAmount);
+      const aliceUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(aliceAddress);
+
+      expect(aliceUsdcUsdtLpBefore.sub(aliceUsdcUsdtLpAfter)).to.be.eq(collateralAmount);
+      expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+      expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(collateralAmount);
+      expect(await usdcUsdtLp.balanceOf(clerk.address)).to.be.eq(collateralAmount);
+      expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(0);
+      expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(0);
+
+      await usdcUsdtLpMarketAsAlice.addCollateral(aliceAddress, collateralAmount);
+      expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(collateralAmount);
+      expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
+      expect(await usdcUsdtLp.balanceOf(clerk.address)).to.be.eq(collateralAmount);
+      expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount);
+      expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
+    });
+
+    context("when Alice has no debt", async () => {
+      context("when she remove to her account", async () => {
+        context("when she remove collateral more than she add", async () => {
+          it("should revert", async () => {
+            await expect(
+              usdcUsdtLpMarketAsAlice.removeCollateralAndWithdraw(
+                aliceAddress,
+                collateralAmount.add(1),
+                ethers.utils.parseEther("1"),
+                ethers.utils.parseEther("1")
+              )
+            ).to.be.reverted;
+          });
+        });
+
+        context("when she remove collateral as much as she add", async () => {
+          it("should work", async () => {
+            const aliceUsdcUsdtLpBefore = await usdcUsdtLp.balanceOf(aliceAddress);
+            await usdcUsdtLpMarketAsAlice.removeCollateralAndWithdraw(
+              aliceAddress,
+              collateralAmount,
+              ethers.utils.parseEther("1"),
+              ethers.utils.parseEther("1")
+            );
+            const aliceUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(aliceAddress);
+
+            expect(aliceUsdcUsdtLpAfter.sub(aliceUsdcUsdtLpBefore)).to.be.eq(collateralAmount);
+            expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+            expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
+            expect(await usdcUsdtLp.balanceOf(clerk.address)).to.be.eq(0);
+            expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(0);
+            expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(0);
+          });
+        });
+      });
+
+      context("when she remove to Bob account", async () => {
+        context("when she remove collateral more than she add", async () => {
+          it("should revert", async () => {
+            await expect(
+              usdcUsdtLpMarketAsAlice.removeCollateralAndWithdraw(
+                bobAddress,
+                collateralAmount.add(1),
+                ethers.utils.parseEther("1"),
+                ethers.utils.parseEther("1")
+              )
+            ).to.be.reverted;
+          });
+        });
+
+        context("when she remove collateral as much as she add", async () => {
+          it("should work", async () => {
+            const aliceUsdcUsdtLpBefore = await usdcUsdtLp.balanceOf(aliceAddress);
+            const bobUsdcUsdtLpBefore = await usdcUsdtLp.balanceOf(bobAddress);
+            await usdcUsdtLpMarketAsAlice.removeCollateralAndWithdraw(
+              bobAddress,
+              collateralAmount,
+              ethers.utils.parseEther("1"),
+              ethers.utils.parseEther("1")
+            );
+            const aliceUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(aliceAddress);
+            const bobUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(bobAddress);
+
+            expect(aliceUsdcUsdtLpAfter.sub(aliceUsdcUsdtLpBefore)).to.be.eq(0);
+            expect(bobUsdcUsdtLpAfter.sub(bobUsdcUsdtLpBefore)).to.be.eq(collateralAmount);
+            expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+            expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
+            expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(0);
+            expect(await usdcUsdtLp.balanceOf(clerk.address)).to.be.eq(0);
+            expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(0);
+            expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(0);
+          });
+        });
+      });
+    });
+
+    context("when Alice has debt", async () => {
+      const borrowAmount = collateralAmount.div(2);
+      const aliceMinCollateral = borrowAmount.mul(10000).div(MAX_COLLATERAL_RATIO);
+      const canRemoveCollateral = collateralAmount.sub(aliceMinCollateral);
+
+      beforeEach(async () => {
+        // Turn off interest before borrow
+        await flatMarketConfig.setConfig(
+          [usdcUsdtLpMarket.address],
+          [
+            {
+              maxCollateralRatio: MAX_COLLATERAL_RATIO,
+              liquidationMultiplier: LIQUIDATION_MULTIPLIER,
+              interestPerSecond: 0,
+            },
+          ]
+        );
+
+        await usdcUsdtLpMarketAsAlice.borrow(
+          aliceAddress,
+          borrowAmount,
+          ethers.utils.parseEther("1"),
+          ethers.utils.parseEther("1")
+        );
+
+        expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount);
+        expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
+        expect(await clerk.balanceOf(flat.address, aliceAddress)).to.be.eq(borrowAmount);
+      });
+
+      context("when she remove to her account", async () => {
+        context("when her position went over MAX_COLLATERAL_RATIO after she removed collateral", async () => {
+          it("should revert", async () => {
+            await expect(
+              usdcUsdtLpMarketAsAlice.removeCollateralAndWithdraw(
+                aliceAddress,
+                canRemoveCollateral.add(1),
+                ethers.utils.parseEther("1"),
+                ethers.utils.parseEther("1")
+              )
+            ).to.be.revertedWith("!safe");
+          });
+        });
+
+        context("when her position still safe after she removed collateral", async () => {
+          it("should work", async () => {
+            // removeCollateral = canRemoveCollateral - 1 wei to round down
+            const removeCollateral = canRemoveCollateral.sub(1);
+
+            const aliceUsdcUsdtLpBefore = await usdcUsdtLp.balanceOf(aliceAddress);
+            await usdcUsdtLpMarketAsAlice.removeCollateralAndWithdraw(
+              aliceAddress,
+              removeCollateral,
+              ethers.utils.parseEther("1"),
+              ethers.utils.parseEther("1")
+            );
+            const aliceUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(aliceAddress);
+
+            expect(aliceUsdcUsdtLpAfter.sub(aliceUsdcUsdtLpBefore)).to.be.eq(removeCollateral);
+            expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
+              collateralAmount.sub(removeCollateral)
+            );
+            expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
+            expect(await clerk.balanceOf(flat.address, aliceAddress)).to.be.eq(borrowAmount);
+            expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount.sub(removeCollateral));
+            expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(
+              collateralAmount.sub(removeCollateral)
+            );
+          });
+        });
+      });
+
+      context("when she remove to Bob account", async () => {
+        context("when her position went over MAX_COLLATERAL_RAITO after she removed collateral", async () => {
+          it("should revert", async () => {
+            await expect(
+              usdcUsdtLpMarketAsAlice.removeCollateralAndWithdraw(
+                bobAddress,
+                canRemoveCollateral.add(1),
+                ethers.utils.parseEther("1"),
+                ethers.utils.parseEther("1")
+              )
+            ).to.be.revertedWith("!safe");
+          });
+        });
+
+        context("when her position still safe after she removed collateral", async () => {
+          it("should work", async () => {
+            // removeCollateral = canRemoveCollateral - 1 wei to round down
+            const removeCollateral = canRemoveCollateral.sub(1);
+
+            const aliceUsdcUsdtLpBefore = await usdcUsdtLp.balanceOf(aliceAddress);
+            const bobUsdcUsdtLpBefore = await usdcUsdtLp.balanceOf(bobAddress);
+            await usdcUsdtLpMarketAsAlice.removeCollateralAndWithdraw(
+              bobAddress,
+              removeCollateral,
+              ethers.utils.parseEther("1"),
+              ethers.utils.parseEther("1")
+            );
+            const aliceUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(aliceAddress);
+            const bobUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(bobAddress);
+
+            expect(aliceUsdcUsdtLpAfter.sub(aliceUsdcUsdtLpBefore)).to.be.eq(0);
+            expect(bobUsdcUsdtLpAfter.sub(bobUsdcUsdtLpBefore)).to.be.eq(removeCollateral);
+            expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
+              collateralAmount.sub(removeCollateral)
+            );
+            expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
+            expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(0);
+            expect(await clerk.balanceOf(flat.address, aliceAddress)).to.be.eq(borrowAmount);
+            expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount.sub(removeCollateral));
+            expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(
+              collateralAmount.sub(removeCollateral)
+            );
+          });
+        });
+      });
+    });
+  });
+
   describe("#repay", async () => {
     const collateralAmount = ethers.utils.parseEther("5000000");
     const borrowAmount = collateralAmount.div(2);
@@ -1445,7 +2012,7 @@ describe("FlatMarket", () => {
           stages["aliceDepositAndBorrow"][0],
           stages["aliceDeposit"][0],
           borrowAmount,
-          INTEREST_PER_SECONDS
+          INTEREST_PER_SECOND
         )
       );
     });
@@ -1481,7 +2048,7 @@ describe("FlatMarket", () => {
               stages["aliceDeposit"][0],
               stages["aliceRepay"][0],
               totalDebtValue,
-              INTEREST_PER_SECONDS
+              INTEREST_PER_SECOND
             )
           );
 
@@ -1520,7 +2087,7 @@ describe("FlatMarket", () => {
           stages["aliceDeposit"][0],
           stages["bobDepositAndBorrow"][0],
           totalDebtValue,
-          INTEREST_PER_SECONDS
+          INTEREST_PER_SECOND
         );
         totalDebtValue = totalDebtValue.add(accruedInterest);
 
@@ -1556,7 +2123,7 @@ describe("FlatMarket", () => {
             stages["bobDepositAndBorrow"][0],
             stages["bobDeposit"][0],
             totalDebtValue,
-            INTEREST_PER_SECONDS
+            INTEREST_PER_SECOND
           )
         );
 
@@ -1580,7 +2147,7 @@ describe("FlatMarket", () => {
               stages["bobDeposit"][0],
               stages["bobRepay"][0],
               totalDebtValue,
-              INTEREST_PER_SECONDS
+              INTEREST_PER_SECOND
             )
           );
 
@@ -1632,7 +2199,7 @@ describe("FlatMarket", () => {
               stages["bobDeposit"][0],
               stages["bobRepay"][0],
               totalDebtValue,
-              INTEREST_PER_SECONDS
+              INTEREST_PER_SECOND
             )
           );
 
