@@ -452,7 +452,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     // Open (flash) liquidation: get proceeds first and provide the borrow after
     clerk.transfer(collateral, address(this), _to, _allCollateralShare);
     if (address(_flashLiquidateStrategy) != address(0)) {
-      _flashLiquidateStrategy.swap(collateral, flat, msg.sender, _allBorrowShare, _allCollateralShare);
+      _flashLiquidateStrategy.execute(collateral, flat, msg.sender, _allBorrowShare, _allCollateralShare);
     }
     clerk.transfer(flat, msg.sender, address(this), _allBorrowShare);
   }
