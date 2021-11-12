@@ -197,13 +197,11 @@ contract Clerk is OwnableUpgradeable {
     uint256 _amount,
     uint256 _share
   ) public payable allowed(_from) returns (uint256 _amountOut, uint256 _shareOut) {
-    // NOTE: Checks
     require(address(_token) != address(0), "Clerk::deposit:: token not set");
     require(_to != address(0), "Clerk::deposit:: to not set"); // To avoid a bad UI from burning funds
     // Harvest
     _harvest(_to, _token);
 
-    // NOTE: Effects
     Conversion memory _total = totals[_token];
     // If a new token gets added, the tokenSupply call checks that this is a deployed contract. Needed for security.
     require(_total.amount != 0 || _token.totalSupply() > 0, "Clerk::deposit:: No tokens");
@@ -218,13 +216,11 @@ contract Clerk is OwnableUpgradeable {
       // amount may be lower than the value of share due to rounding, in that case, add 1 to amount (Always round up)
       _amount = _total.toAmount(_share, true);
     }
-
     balanceOf[_token][_to] = balanceOf[_token][_to] + _share;
     _total.share = _total.share + _share.toUint128();
     _total.amount = _total.amount + _amount.toUint128();
     totals[_token] = _total;
 
-    // NOTE: Interactions
     _safeWrap(_from, _token, _amount);
     // does house keeping, either deposit or withdraw
     _houseKeeping(_to, _token);
@@ -247,14 +243,12 @@ contract Clerk is OwnableUpgradeable {
     uint256 _amount,
     uint256 _share
   ) public allowed(_from) returns (uint256 _amountOut, uint256 _shareOut) {
-    // NOTE: Checks
     require(address(_token) != address(0), "Clerk::withdraw:: token not set");
     require(_to != address(0), "Clerk::withdraw:: to not set"); // To avoid a bad UI from burning funds
 
     // Harvest
-    _harvest(_to, _token);
+    _harvest(_from, _token);
 
-    // NOTE: Effects
     Conversion memory _total = totals[_token];
     if (_share == 0) {
       // value of the share paid could be lower than the amount paid due to rounding, in that case, add a share (Always round up)
@@ -271,9 +265,8 @@ contract Clerk is OwnableUpgradeable {
     require(_total.share >= MINIMUM_SHARE_BALANCE || _total.share == 0, "Clerk::withdraw:: cannot empty");
     totals[_token] = _total;
 
-    // NOTE: Interactions
     // does house keeping, either deposit or withdraw
-    _houseKeeping(_to, _token);
+    _houseKeeping(_from, _token);
 
     _safeUnwrap(_token, _to, _amount);
 
@@ -293,14 +286,12 @@ contract Clerk is OwnableUpgradeable {
     address _to,
     uint256 _share
   ) public allowed(_from) {
-    // NOTE: Checks
     require(_to != address(0), "Clerk::transfer:: to not set"); // To avoid a bad UI from burning funds
 
     // Harvest reward (if any) for _from and _to
     _harvest(_from, _token);
     _harvest(_to, _token);
 
-    // NOTE: Effects
     balanceOf[_token][_from] = balanceOf[_token][_from] - _share;
     balanceOf[_token][_to] = balanceOf[_token][_to] + _share;
 
@@ -318,10 +309,8 @@ contract Clerk is OwnableUpgradeable {
     address[] calldata _tos,
     uint256[] calldata _shares
   ) public allowed(_from) {
-    // NOTE: Checks
     require(_tos[0] != address(0), "Clerk::transferMultiple:: to[0] not set"); // To avoid a bad UI from burning funds
 
-    // NOTE: Effects
     uint256 _totalAmount;
     uint256 _len = _tos.length;
 
@@ -399,10 +388,8 @@ contract Clerk is OwnableUpgradeable {
   /// @param _token The address of the token that maps to a strategy to change.
   /// @param _targetBps The new target in percent. Must be lesser or equal to `MAX_TARGET_BPS`.
   function setStrategyTargetBps(IERC20Upgradeable _token, uint64 _targetBps) public onlyOwner {
-    // NOTE: Checks
     require(_targetBps <= MAX_TARGET_BPS, "Clerk::setStrategyTargetBps:: Target too high");
 
-    // NOTE: Effects
     strategyData[_token].targetBps = _targetBps;
     emit LogStrategyTargetBps(_token, _targetBps);
   }
@@ -414,7 +401,6 @@ contract Clerk is OwnableUpgradeable {
     StrategyData memory _data = strategyData[_token];
     if (address(strategy[_token]) != address(0)) {
       int256 _balanceChange = strategy[_token].exit(_data.balance);
-      // NOTE: Effects
       if (_balanceChange > 0) {
         uint256 _add = uint256(_balanceChange);
         totals[_token].addAmount(_add);
