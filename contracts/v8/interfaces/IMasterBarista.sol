@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
+/**
+  |¯¯¯¯¯|||¯¯¯¯|  '      /¯¯¯¯¯| |¯¯¯¯¯|°
+  |    ¯¯|  |       |__   /     !     | |         | 
+  |__|¯¯'  |______| /___/¯|__'|  ¯|__|¯  
+*/
 
 pragma solidity 0.8.9;
 
 interface IMasterBarista {
-  /// @dev functions return information. no states changed.
   function poolLength() external view returns (uint256);
 
   function pendingLatte(address _stakeToken, address _user) external view returns (uint256);
@@ -22,7 +26,6 @@ interface IMasterBarista {
 
   function devFeeBps() external view returns (uint256);
 
-  /// @dev configuration functions
   function addPool(address _stakeToken, uint256 _allocPoint) external;
 
   function setPool(address _stakeToken, uint256 _allocPoint) external;
@@ -31,7 +34,6 @@ interface IMasterBarista {
 
   function removePool(address _stakeToken) external;
 
-  /// @dev user interaction functions
   function deposit(
     address _for,
     address _stakeToken,

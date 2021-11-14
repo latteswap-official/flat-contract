@@ -21,7 +21,6 @@ import "./interfaces/IFlashBorrower.sol";
 import "./interfaces/IBatchFlashBorrower.sol";
 import "./interfaces/IWBNB.sol";
 import "./interfaces/IStrategy.sol";
-import "./interfaces/IERC20Permit.sol";
 
 import "./libraries/LatteConversion.sol";
 

@@ -12,7 +12,9 @@
     "prettier-format:default": "prettier --config .prettierrc 'deploy/**/*.ts' 'utils/**/*.ts' 'scripts/**/*.ts' 'tests/**/*.ts' --write",
     "deploy:mainnet": "hardhat --network mainnet deploy --reset",
     "test": "hardhat test --no-compile",
+    "test:integrations:clerk": "hardhat test --no-compile ./tests/integration/Clerk.test.ts",
     "test:integrations:flatMarket": "hardhat test --no-compile ./tests/integrations/FlatMarket.test.ts",
+    "test:integrations:flatMarketConfig": "hardhat test --no-compile ./tests/integrations/FlatMarketConfig.test.ts",
     "test:unit:tokenChainlinkAggregator": "hardhat test --no-compile ./tests/unit/TokenChainlinkAggregator.test.ts",
     "test:unit:lpChainlinkAggregator": "hardhat test --no-compile ./tests/unit/LPChainlinkAggregator.test.ts",
     "test:unit:latteSwapYieldStrategy": "hardhat test --no-compile ./tests/unit/LatteSwapYieldStrategy.test.ts",
@@ -20,7 +22,6 @@
     "test:unit:clerk": "hardhat test --no-compile ./tests/unit/clerk.test.ts",
     "test:unit:compositeOracle": "hardhat test --no-compile ./tests/unit/CompositeOracle.test.ts",
     "test:unit:offChainOracle": "hardhat test --no-compile ./tests/unit/OffChainOracle.test.ts",
-    "test:integration:clerk": "hardhat test --no-compile ./tests/integration/Clerk.test.ts",
     "mainnet": "hardhat console --network mainnet",
     "test:case": "mocha --timeout 500000 --require hardhat/register --file tests/**/* --extension ts -g",
     "prepublishOnly": "yarn compile && yarn build"

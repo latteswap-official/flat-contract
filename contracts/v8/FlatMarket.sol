@@ -42,6 +42,11 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   event LogFeeTo(address indexed newFeeTo);
   event LogSetInterestPerSec(uint256 oldInterestPerSec, uint256 newInterestPerSec);
   event LogWithdrawSurplus(address indexed feeTo, uint256 surplus);
+  event LogWithdrawLiquidationFee(address indexed feeTo, uint256 liquidationFee);
+
+  /// @dev Constants
+  uint256 private constant BPS_PRECISION = 1e4;
+  uint256 private constant COLLATERAL_PRICE_PRECISION = 1e18;
 
   /// @dev Default configuration states.
   /// These configurations are expected to be the same amongs markets.
@@ -67,16 +72,13 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
   /// @dev Interest-related states
   uint256 public lastAccrueTime;
+
+  /// @dev Protocol revenue
   uint256 public surplus;
+  uint256 public liquidationFee;
 
   /// @dev Fee & Risk parameters
   IFlatMerketConfig public marketConfig;
-
-  uint256 private constant COLLATERIZATION_RATE_PRECISION = 1e4;
-  uint256 private constant COLLATERAL_PRICE_PRECISION = 1e18;
-  uint256 private constant LIQUIDATION_MULTIPLIER_PRECISION = 1e4;
-  uint256 private constant DISTRIBUTION_PART = 10;
-  uint256 private constant DISTRIBUTION_PRECISION = 100;
 
   /// @notice The constructor is only used for the initial master contract.
   /// Subsequent clones are initialised via `init`.
@@ -188,7 +190,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   }
 
   /// @notice Sender borrows `_amount` and transfers it to `to`.
-  /// @dev "checkSafe" modifier prevents msg.sender from borrow > maxCollateralRatio
+  /// @dev "checkSafe" modifier prevents msg.sender from borrow > collateralFactor
   /// @param _to The address to received borrowed FLAT
   /// @param _borrowAmount The amount of FLAT to be borrowed
   function borrow(
@@ -209,7 +211,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   }
 
   /// @notice Sender borrows `_amount` and transfers it to `to`.
-  /// @dev "checkSafe" modifier prevents msg.sender from borrow > maxCollateralRatio
+  /// @dev "checkSafe" modifier prevents msg.sender from borrow > collateralFactor
   /// @param _to The address to received borrowed FLAT
   /// @param _borrowAmount The amount of FLAT to be borrowed
   /// @param _minPrice The minimum price for collateral
@@ -234,14 +236,14 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     _vaultWithdraw(flat, _to, _borrowAmount, 0);
   }
 
-  /// @notice Return if "_user" is safe from liquidation.
-  /// @dev Beware of unaccrue interest. accrue() is expected to be call before _isSafe.
+  /// @notice Return if true "_user" is safe from liquidation.
+  /// @dev Beware of unaccrue interest. accrue is expected to be executed before _isSafe.
   /// @param _user The address to check if it is safe from liquidation.
   /// @param _collateralPrice The exchange rate. Used to cache the `exchangeRate` between calls.
   function _checkSafe(address _user, uint256 _collateralPrice) internal view returns (bool) {
-    uint256 _maxCollateralRatio = marketConfig.maxCollateralRatio(address(this), _user);
+    uint256 _collateralFactor = marketConfig.collateralFactor(address(this), _user);
 
-    require(_maxCollateralRatio >= 5000, "bad maxCollateralRatio");
+    require(_collateralFactor <= 9500 && _collateralFactor >= 5000, "bad collateralFactor");
 
     uint256 _userDebtShare = userDebtShare[_user];
     if (_userDebtShare == 0) return true;
@@ -249,11 +251,9 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     if (_userCollateralShare == 0) return false;
 
     return
-      clerk.toAmount(
-        collateral,
-        _userCollateralShare * (COLLATERAL_PRICE_PRECISION / COLLATERIZATION_RATE_PRECISION) * _maxCollateralRatio,
-        false
-      ) >= (_userDebtShare * totalDebtValue * _collateralPrice) / totalDebtShare;
+      (clerk.toAmount(collateral, _userCollateralShare, false) * _collateralPrice * _collateralFactor) /
+        BPS_PRECISION >=
+      (_userDebtShare * totalDebtValue * COLLATERAL_PRICE_PRECISION) / totalDebtShare;
   }
 
   /// @notice Return the debt value of the given debt share.
@@ -387,7 +387,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     _vaultWithdraw(collateral, _to, _collateralAmount, 0);
   }
 
-  /// @notice Kill user's positions if the maxCollateralRation conditon is met.
+  /// @notice Kill user's positions if the _collateralFactor conditon is met.
   /// @param _users An array of user addresses.
   /// @param _maxDebtShares A one-to-one mapping to `users`, contains maximum (partial) borrow amounts (to liquidate) of the respective user.
   /// @param _to Address of the receiver in open liquidations if `swapper` is zero.
@@ -397,69 +397,120 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     address _to,
     IFlashLiquidateStrategy _flashLiquidateStrategy
   ) public nonReentrant accrue {
+    console.log("====== kill =======");
     // 1. Load required config
-    uint256 _liquidationMultiplier = marketConfig.liquidationMultiplier(address(this));
-    require(_liquidationMultiplier > 0, "bad liquidation multiplier");
+    uint256 _liquidationPenalty = marketConfig.liquidationPenalty(address(this));
+    uint256 _liquidationTreasuryBps = marketConfig.liquidationTreasuryBps(address(this));
+    require(_liquidationPenalty <= 19000 && _liquidationPenalty >= 10000, "bad liquidation penalty");
+    require(marketConfig.treasury() != address(0), "bad treasury");
 
     // 2. Force update collateral price
     (, uint256 _collateralPrice) = updateCollateralPrice();
 
-    uint256 _allCollateralShare = 0;
-    uint256 _allBorrowAmount = 0;
-    uint256 _allBorrowPart = 0;
+    console.log("_collateralPrice: ", _collateralPrice);
+
+    // 3. Prepare variables
+    uint256 _sumCollateralShare = 0;
+    uint256 _sumDebtAmount = 0;
+    uint256 _sumDebtShare = 0;
     Conversion memory _flatVaultTotals = clerk.totals(collateral);
+
+    // 4. Loop-through all users to check if we are able to liquidate
     for (uint256 i = 0; i < _users.length; i++) {
       address _user = _users[i];
+      console.log("> liquidating ", _user);
+      // 4.1. If user position not safe, then can liquidate
       if (!_checkSafe(_user, _collateralPrice)) {
-        uint256 _debtShare;
-        {
-          uint256 _userDebtShare = userDebtShare[_user];
-          _debtShare = _maxDebtShares[i] > _userDebtShare ? _userDebtShare : _maxDebtShares[i];
-          userDebtShare[_user] = _userDebtShare - _debtShare;
-        }
-        uint256 _borrowAmount = debtShareToValue(_debtShare, false);
+        console.log("> position not safe");
+        console.log("> _userDebtShare: ", userDebtShare[_user]);
+        // 4.1.1. Findout how much debt share to liquidate
+        uint256 _lessDebtShare = MathUpgradeable.min(_maxDebtShares[i], userDebtShare[_user]);
+        console.log("> _lessDebtShare: ", _lessDebtShare);
+        // 4.1.2. Convert debt share to FLAT value
+        uint256 _borrowAmount = debtShareToValue(_lessDebtShare, false);
+        // 4.1.3. Calculate collateral share to be taken out by liquidator
+        console.log("> _borrowAmount: ", _borrowAmount);
         uint256 _collateralShare = _flatVaultTotals.toShare(
-          (_borrowAmount * _liquidationMultiplier * _collateralPrice) /
-            (LIQUIDATION_MULTIPLIER_PRECISION * COLLATERAL_PRICE_PRECISION),
+          (_borrowAmount * _liquidationPenalty * COLLATERAL_PRICE_PRECISION) / (BPS_PRECISION * _collateralPrice),
           false
         );
 
-        userCollateralShare[_user] = userCollateralShare[_user] - _collateralShare;
-        emit LogRemoveCollateral(_user, _to, _collateralShare);
-        emit LogRepay(msg.sender, _user, _borrowAmount, _debtShare);
+        // 4.1.4. If the value of leftover collateral less than minDebtSize then liquidator should take all
+        // Need to recalculate _lessDebtShare and _borrowAmount as well.
+        if (
+          _collateralShare > userCollateralShare[_user] ||
+          clerk.toAmount(collateral, userCollateralShare[_user], false) * _collateralPrice <
+          marketConfig.minDebtSize(address(this))
+        ) {
+          console.log("> take all collateral");
+          // Take out all collateral
+          _collateralShare = userCollateralShare[_user];
+          userCollateralShare[_user] = 0;
 
-        // Keep totals
-        _allCollateralShare = _allCollateralShare + _collateralShare;
-        _allBorrowAmount = _allBorrowAmount + _borrowAmount;
-        _allBorrowPart = _allBorrowPart + _debtShare;
+          // Recalculate borrowAmount & lessDebtShare
+          // borrowAmount should be discounted instead of discount on collateral.
+          // Round debtShare up to make sure it is not zero if borrowAmount is tiny.
+          _borrowAmount =
+            (clerk.toAmount(collateral, _collateralShare, false) * _collateralPrice * (2e4 - _liquidationPenalty)) /
+            (COLLATERAL_PRICE_PRECISION * BPS_PRECISION);
+          _lessDebtShare = debtValueToShare(_borrowAmount, true);
+          console.log("> _borrowAmount: ", _borrowAmount);
+          console.log("> _lessDebtShare: ", _lessDebtShare);
+        } else {
+          userCollateralShare[_user] = userCollateralShare[_user] - _collateralShare;
+        }
+
+        // Update userDebtShare
+        userDebtShare[_user] = userDebtShare[_user] - _lessDebtShare;
+
+        emit LogRemoveCollateral(_user, _to, _collateralShare);
+        emit LogRepay(msg.sender, _user, _borrowAmount, _lessDebtShare);
+
+        // 4.1.5. If user's collateral is 0, but debtShare is not 0;
+        // Then it is bad debt. Hence move user's debt share to treasury.
+        // Treausry will settle bad debt later by surplus or liquidation fee
+        if (userCollateralShare[_user] == 0 && userDebtShare[_user] != 0) {
+          userDebtShare[marketConfig.treasury()] = userDebtShare[_user];
+          userDebtShare[_user] = 0;
+        }
+
+        // 4.1.6. Update total vairables
+        _sumCollateralShare = _sumCollateralShare + _collateralShare;
+        _sumDebtAmount = _sumDebtAmount + _borrowAmount;
+        _sumDebtShare = _sumDebtShare + _lessDebtShare;
       }
     }
-    require(_allBorrowAmount != 0, "all healthy");
 
-    totalDebtValue = totalDebtValue - _allBorrowAmount;
-    totalDebtShare = totalDebtShare - _allBorrowPart;
+    // 5. Revert if all users are safe
+    require(_sumDebtAmount != 0, "all healthy");
 
-    totalCollateralShare = totalCollateralShare - _allCollateralShare;
+    // 6. Update market global states
+    totalDebtValue = totalDebtValue - _sumDebtAmount;
+    totalDebtShare = totalDebtShare - _sumDebtShare;
+    totalCollateralShare = totalCollateralShare - _sumCollateralShare;
 
+    // 7. Take out treasury fee on liquidation
     {
-      uint256 _distributionAmount = ((((_allBorrowAmount * _liquidationMultiplier) / LIQUIDATION_MULTIPLIER_PRECISION) -
-        _allBorrowAmount) * DISTRIBUTION_PART) / DISTRIBUTION_PRECISION; // Distribution Amount
-      _allBorrowAmount = _allBorrowAmount + _distributionAmount;
-      surplus = surplus + _distributionAmount;
+      uint256 _distributionAmount = ((((_sumDebtAmount * _liquidationPenalty) / BPS_PRECISION) - _sumDebtAmount) *
+        _liquidationTreasuryBps) / BPS_PRECISION;
+      _sumDebtAmount = _sumDebtAmount + _distributionAmount;
+      liquidationFee = liquidationFee + _distributionAmount;
     }
 
-    uint256 _allBorrowShare = clerk.toShare(flat, _allBorrowAmount, true);
+    // 8. Convert liquidatable amount to share
+    uint256 _allBorrowShare = clerk.toShare(flat, _sumDebtAmount, true);
 
-    // Swap using a swapper freely chosen by the caller
-    // Open (flash) liquidation: get proceeds first and provide the borrow after
-    clerk.transfer(collateral, address(this), _to, _allCollateralShare);
+    // 9. Transfer collateral to liquidator
+    clerk.transfer(collateral, address(this), _to, _sumCollateralShare);
     if (address(_flashLiquidateStrategy) != address(0)) {
-      _flashLiquidateStrategy.swap(collateral, flat, msg.sender, _allBorrowShare, _allCollateralShare);
+      // 9.1. If flash liquidate strategy is set, then call the strategy
+      _flashLiquidateStrategy.execute(collateral, flat, msg.sender, _allBorrowShare, _sumCollateralShare);
     }
+    // 10. Debit FLAT from liquidator, if liquidator doesn't has enough FLAT, then it should revert
     clerk.transfer(flat, msg.sender, address(this), _allBorrowShare);
   }
 
-  /// @notice reduces the supply of FLAT
+  /// @notice Reduce the supply of FLAT
   /// @param _amount amount to reduce supply by
   function reduceSupply(uint256 _amount) public onlyOwner {
     clerk.withdraw(flat, address(this), address(this), _amount, 0);
@@ -602,22 +653,27 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     _vaultWithdraw(_token, _to, _collateralAmount, 0);
   }
 
-  /// @notice Withdraws accumulated surplus.
-  function withdrawSurplus() external accrue {
-    // 1. Load required config
-    address _feeTreasury = marketConfig.feeTreasury();
-    require(_feeTreasury != address(0), "bad feeTreasury");
+  /// @notice Withdraws accumulated surplus + liquidation fee.
+  function withdrawRevenue() external accrue returns (uint256, uint256) {
+    require(marketConfig.treasury() != address(0), "bad treasury");
+    require(marketConfig.treasury() == msg.sender, "not treasury");
 
-    // 2. Cached old surplus
+    // 1. Cached old data
     uint256 _surplus = surplus;
+    uint256 _liquidationFee = liquidationFee;
 
-    // 3. Update surplus and calculate _share to be transferred
-    uint256 _share = clerk.toShare(flat, surplus, false);
+    // 2. Update calculate _share to be transferred
+    uint256 _surplusShare = clerk.toShare(flat, surplus, false);
+    uint256 _liquidationFeeShare = clerk.toShare(flat, liquidationFee, false);
     surplus = 0;
+    liquidationFee = 0;
 
-    // 4. Perform the actual transfer
-    clerk.transfer(flat, address(this), _feeTreasury, _share);
+    // 3. Perform the actual transfer
+    clerk.transfer(flat, address(this), marketConfig.treasury(), _surplusShare + _liquidationFeeShare);
 
-    emit LogWithdrawSurplus(_feeTreasury, _surplus);
+    emit LogWithdrawSurplus(marketConfig.treasury(), _surplus);
+    emit LogWithdrawLiquidationFee(marketConfig.treasury(), _liquidationFee);
+
+    return (_surplus, _liquidationFee);
   }
 }

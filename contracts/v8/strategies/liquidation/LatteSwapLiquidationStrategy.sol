@@ -25,8 +25,7 @@ contract SushiSwapSwapper is IFlashLiquidateStrategy, Initializable {
   }
 
   // Swaps to a flexible amount, from an exact input amount
-  /// @inheritdoc IFlashLiquidateStrategy
-  function swap(
+  function execute(
     IERC20Upgradeable _fromToken,
     IERC20Upgradeable _toToken,
     address _recipient,
@@ -50,40 +49,5 @@ contract SushiSwapSwapper is IFlashLiquidateStrategy, Initializable {
 
     (, shareReturned) = clerk.deposit(_toToken, address(clerk), _recipient, _amountTo, 0);
     extraShare = shareReturned - _minShareTo;
-  }
-
-  // Swaps to an exact amount, from a flexible input amount
-  /// @inheritdoc IFlashLiquidateStrategy
-  function swapExact(
-    IERC20Upgradeable _fromToken,
-    IERC20Upgradeable _toToken,
-    address _recipient,
-    address _refundTo,
-    uint256 _suppliedShareFrom,
-    uint256 _exactShareTo
-  ) public override returns (uint256 shareUsed, uint256 shareReturned) {
-    ILatteSwapPair _pair = ILatteSwapPair(factory.getPair(address(_fromToken), address(_toToken)));
-
-    (uint256 _reserve0, uint256 _reserve1, ) = _pair.getReserves();
-
-    uint256 _amountToExact = clerk.toAmount(_toToken, _exactShareTo, true);
-
-    uint256 _amountFrom;
-    if (_toToken > _fromToken) {
-      _amountFrom = router.getAmountIn(_amountToExact, _reserve0, _reserve1);
-      (, shareUsed) = clerk.withdraw(_fromToken, address(this), address(_pair), _amountFrom, 0);
-      _pair.swap(0, _amountToExact, address(clerk), "");
-    } else {
-      _amountFrom = router.getAmountIn(_amountToExact, _reserve1, _reserve0);
-      (, shareUsed) = clerk.withdraw(_fromToken, address(this), address(_pair), _amountFrom, 0);
-      _pair.swap(_amountToExact, 0, address(clerk), "");
-    }
-
-    clerk.deposit(_toToken, address(clerk), _recipient, 0, _exactShareTo);
-    shareReturned = _suppliedShareFrom - shareUsed;
-
-    if (shareReturned > 0) {
-      clerk.transfer(_fromToken, address(this), _refundTo, shareReturned);
-    }
   }
 }
