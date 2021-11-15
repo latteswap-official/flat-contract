@@ -1,5 +1,5 @@
 import { ethers, upgrades, waffle } from "hardhat";
-import { BigNumber, Signer, constants, BigNumberish } from "ethers";
+import { BigNumber, Signer, BigNumberish } from "ethers";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
 import {
@@ -34,6 +34,8 @@ chai.use(solidity);
 const { expect } = chai;
 
 describe("FlatMarket", () => {
+  const DAY = ethers.BigNumber.from(24 * 60 * 60);
+  const MAX_MINT_BPS = ethers.BigNumber.from(1500);
   const MIN_DEBT_SIZE = ethers.utils.parseEther("1");
   const LIQUIDATION_PENALTY = ethers.BigNumber.from("10500");
   const LIQUIDATION_TREASURY_BPS = ethers.BigNumber.from("1000");
@@ -185,7 +187,7 @@ describe("FlatMarket", () => {
 
     // Deploy FLAT
     const FLAT = (await ethers.getContractFactory("FLAT", deployer)) as FLAT__factory;
-    flat = await FLAT.deploy();
+    flat = await FLAT.deploy(DAY, MAX_MINT_BPS);
 
     // Deploy MarketConfig
     const FlatMarketConfig = (await ethers.getContractFactory(
@@ -218,8 +220,8 @@ describe("FlatMarket", () => {
     // Increase timestamp by 1 day to allow more FLAT to be minted
     await timeHelpers.increaseTimestamp(timeHelpers.DAY);
 
-    // Mint FLAT to usdcUsdtLpMarket
-    await flat.mintToClerk(usdcUsdtLpMarket.address, ethers.utils.parseEther("100000000"), clerk.address);
+    // Replenish FLAT to usdcUsdtLpMarket
+    await flat.replenish(usdcUsdtLpMarket.address, ethers.utils.parseEther("100000000"), clerk.address);
 
     // Assuming someone try to borrow FLAT from usdcUsdtLpMarket when it is not setup yet
     await usdcUsdtLp.approve(clerk.address, ethers.constants.MaxUint256);
