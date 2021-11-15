@@ -25,6 +25,7 @@
     "test:unit:clerk": "hardhat test --no-compile ./tests/unit/clerk.test.ts",
     "test:unit:compositeOracle": "hardhat test --no-compile ./tests/unit/CompositeOracle.test.ts",
     "test:unit:offChainOracle": "hardhat test --no-compile ./tests/unit/OffChainOracle.test.ts",
+    "test:unit:treasuryHolder": "hardhat test --no-compile ./tests/unit/TreasuryHolder.test.ts",
     "mainnet": "hardhat console --network mainnet",
     "test:case": "mocha --timeout 500000 --require hardhat/register --file tests/**/* --extension ts -g",
     "prepublishOnly": "yarn compile && yarn build"

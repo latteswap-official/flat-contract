@@ -15,7 +15,6 @@ import {
 import { BigNumber, constants } from "ethers";
 import { MockContract } from "@defi-wonderland/smock";
 import { MockWBNB } from "@latteswap/latteswap-contract/compiled-typechain";
-import { time } from "console";
 import { duration, increaseTimestamp } from "../helpers/time";
 
 chai.use(solidity);
