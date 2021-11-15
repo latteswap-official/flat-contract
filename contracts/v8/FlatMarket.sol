@@ -331,14 +331,8 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   /// @notice Repays a loan.
   /// @param _for Address of the user this payment should go.
   /// @param _maxDebtReturn The maxium amount of FLAT to be return.
-  /// @param _minPrice The minimum price to prevent slippage
-  /// @param _maxPrice The maximum price to prevent slippage
-  function depositAndRepay(
-    address _for,
-    uint256 _maxDebtReturn,
-    uint256 _minPrice,
-    uint256 _maxPrice
-  ) external nonReentrant accrue updateCollateralPriceWithSlippageCheck(_minPrice, _maxPrice) returns (uint256) {
+  function depositAndRepay(address _for, uint256 _maxDebtReturn) external nonReentrant accrue returns (uint256) {
+    updateCollateralPrice();
     // 1. Find out how much debt to repaid
     uint256 _debtValue = MathUpgradeable.min(_maxDebtReturn, debtShareToValue(userDebtShare[_for], true));
 
@@ -575,14 +569,8 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   /// @notice Repays a loan.
   /// @param _for Address of the user this payment should go.
   /// @param _maxDebtValue The maximum amount of FLAT to be repaid.
-  /// @param _minPrice The minimum price to prevent slippage
-  /// @param _maxPrice The maximum price to prevent slippage
-  function repay(
-    address _for,
-    uint256 _maxDebtValue,
-    uint256 _minPrice,
-    uint256 _maxPrice
-  ) external nonReentrant accrue updateCollateralPriceWithSlippageCheck(_minPrice, _maxPrice) returns (uint256) {
+  function repay(address _for, uint256 _maxDebtValue) external nonReentrant accrue returns (uint256) {
+    updateCollateralPrice();
     uint256 _debtValue = MathUpgradeable.min(_maxDebtValue, debtShareToValue(userDebtShare[_for], true));
     _repay(_for, _debtValue);
     return _debtValue;

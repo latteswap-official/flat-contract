@@ -890,12 +890,7 @@ describe("FlatMarket", () => {
       context("when she repay all borrowed FLAT", async () => {
         it("should have some interest left", async () => {
           const usdcUsdtLpMarketFlatBefore = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
-          await usdcUsdtLpMarketAsAlice.depositAndRepay(
-            aliceAddress,
-            repayFunds,
-            ethers.utils.parseEther("1"),
-            ethers.utils.parseEther("1")
-          );
+          await usdcUsdtLpMarketAsAlice.depositAndRepay(aliceAddress, repayFunds);
           const usdcUsdtLpMarketFlatAfter = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
           stages["aliceDepositAndRepay"] = [await timeHelpers.latestTimestamp()];
 
@@ -978,12 +973,7 @@ describe("FlatMarket", () => {
       context("when he repay all borrowed FLAT except interest", async () => {
         it("should have some interest left", async () => {
           const usdcUsdtLpMarketFlatBefore = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
-          await usdcUsdtLpMarketAsBob.depositAndRepay(
-            aliceAddress,
-            repayFunds,
-            ethers.utils.parseEther("1"),
-            ethers.utils.parseEther("1")
-          );
+          await usdcUsdtLpMarketAsBob.depositAndRepay(aliceAddress, repayFunds);
           const usdcUsdtLpMarketFlatAfter = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
           stages["bobRepay"] = [await timeHelpers.latestTimestamp()];
 
@@ -1030,12 +1020,7 @@ describe("FlatMarket", () => {
       context("when he repay all borrowed FLAT + interest", async () => {
         it("should have some interest left", async () => {
           const usdcUsdtLpMarketFlatBefore = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
-          await usdcUsdtLpMarketAsBob.depositAndRepay(
-            aliceAddress,
-            ethers.constants.MaxUint256,
-            ethers.utils.parseEther("1"),
-            ethers.utils.parseEther("1")
-          );
+          await usdcUsdtLpMarketAsBob.depositAndRepay(aliceAddress, ethers.constants.MaxUint256);
           const usdcUsdtLpMarketFlatAfter = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
           stages["bobRepay"] = [await timeHelpers.latestTimestamp()];
 
@@ -2545,26 +2530,14 @@ describe("FlatMarket", () => {
     context("when Alice repay to her account", async () => {
       context("when she try repay more than what she has in Clerk", async () => {
         it("should revert", async () => {
-          await expect(
-            usdcUsdtLpMarketAsAlice.repay(
-              aliceAddress,
-              repayFunds.add(1),
-              ethers.utils.parseEther("1"),
-              ethers.utils.parseEther("1")
-            )
-          ).to.be.reverted;
+          await expect(usdcUsdtLpMarketAsAlice.repay(aliceAddress, repayFunds.add(1))).to.be.reverted;
         });
       });
 
       context("when she repay all borrowed FLAT", async () => {
         it("should have some interest left", async () => {
           const usdcUsdtLpMarketFlatBefore = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
-          await usdcUsdtLpMarketAsAlice.repay(
-            aliceAddress,
-            repayFunds,
-            ethers.utils.parseEther("1"),
-            ethers.utils.parseEther("1")
-          );
+          await usdcUsdtLpMarketAsAlice.repay(aliceAddress, repayFunds);
           const usdcUsdtLpMarketFlatAfter = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
           stages["aliceRepay"] = [await timeHelpers.latestTimestamp()];
 
@@ -2658,12 +2631,7 @@ describe("FlatMarket", () => {
       context("when he repay all borrowed FLAT (exclude interest)", async () => {
         it("should have some interest left", async () => {
           const usdcUsdtLpMarketFlatBefore = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
-          await usdcUsdtLpMarketAsBob.repay(
-            aliceAddress,
-            repayFunds,
-            ethers.utils.parseEther("1"),
-            ethers.utils.parseEther("1")
-          );
+          await usdcUsdtLpMarketAsBob.repay(aliceAddress, repayFunds);
           const usdcUsdtLpMarketFlatAfter = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
           stages["bobRepay"] = [await timeHelpers.latestTimestamp()];
 
@@ -2710,12 +2678,7 @@ describe("FlatMarket", () => {
       context("when he repay all borrowed FLAT (interest included)", async () => {
         it("should have some interest left", async () => {
           const usdcUsdtLpMarketFlatBefore = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
-          await usdcUsdtLpMarketAsBob.repay(
-            aliceAddress,
-            ethers.constants.MaxUint256,
-            ethers.utils.parseEther("1"),
-            ethers.utils.parseEther("1")
-          );
+          await usdcUsdtLpMarketAsBob.repay(aliceAddress, ethers.constants.MaxUint256);
           const usdcUsdtLpMarketFlatAfter = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
           stages["bobRepay"] = [await timeHelpers.latestTimestamp()];
 
