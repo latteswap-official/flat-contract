@@ -26,8 +26,7 @@ import "./FLAT.sol";
 import "hardhat/console.sol";
 
 /// @title FlatMarket - A place where fellow baristas come and get their FLAT.
-// solhint-disable avoid-low-level-calls
-// solhint-disable no-inline-assembly
+// solhint-disable not-rely-on-time
 contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   using LatteConversion for Conversion;
   using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -402,6 +401,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     uint256 _liquidationPenalty = marketConfig.liquidationPenalty(address(this));
     uint256 _liquidationTreasuryBps = marketConfig.liquidationTreasuryBps(address(this));
     require(_liquidationPenalty <= 19000 && _liquidationPenalty >= 10000, "bad liquidation penalty");
+    require(_liquidationTreasuryBps <= 2000 && _liquidationTreasuryBps >= 500, "bad liquidation treasury bps");
     require(marketConfig.treasury() != address(0), "bad treasury");
 
     // 2. Force update collateral price
@@ -654,7 +654,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   }
 
   /// @notice Withdraws accumulated surplus + liquidation fee.
-  function withdrawRevenue() external accrue returns (uint256, uint256) {
+  function withdrawSurplus() external accrue returns (uint256, uint256) {
     require(marketConfig.treasury() != address(0), "bad treasury");
     require(marketConfig.treasury() == msg.sender, "not treasury");
 
