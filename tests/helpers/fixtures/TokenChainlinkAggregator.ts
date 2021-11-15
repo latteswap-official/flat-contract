@@ -16,7 +16,7 @@ export interface ITokenChainlinkAggregatorDTO {
   wbnb: SimpleToken;
   mockRefBNBBUSD: MockContract;
   mockRefTOKENBNB: MockContract;
-  mockRefTOKENBUSD: MockContract;
+  mockRefTOKENUSD: MockContract;
   tokenChainlinkAggregator: TokenChainlinkAggregator;
 }
 
@@ -53,11 +53,10 @@ export async function tokenChainlinkAggregatorUnitTestFixture(
   )) as TokenChainlinkAggregator__factory;
   const mockRefBNBBUSD = await smockit(refBNBUSD);
   const mockRefTOKENBNB = await smockit(refSimpleTokenBNB);
-  const mockRefTOKENBUSD = await smockit(refSimpleTokenBUSD);
+  const mockRefTOKENUSD = await smockit(refSimpleTokenBUSD);
   const tokenChainlinkAggregator = (await upgrades.deployProxy(TokenChainlinkAggregator, [
     wbnb.address,
     mockRefBNBBUSD.address,
-    simpleToken.address,
   ])) as TokenChainlinkAggregator;
   await tokenChainlinkAggregator.deployed();
 
@@ -67,6 +66,6 @@ export async function tokenChainlinkAggregatorUnitTestFixture(
     tokenChainlinkAggregator,
     mockRefBNBBUSD,
     mockRefTOKENBNB,
-    mockRefTOKENBUSD,
+    mockRefTOKENUSD,
   } as ITokenChainlinkAggregatorDTO;
 }

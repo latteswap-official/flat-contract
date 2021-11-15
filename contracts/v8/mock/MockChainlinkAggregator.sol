@@ -19,6 +19,8 @@ contract MockChainlinkAggregator {
     return string("foo");
   }
 
+  function decimals() external view returns (uint8) {}
+
   function latestRoundData()
     external
     view

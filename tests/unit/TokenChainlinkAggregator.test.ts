@@ -16,11 +16,11 @@ describe("TokenChainlinkAggregator", () => {
   let wbnb: SimpleToken;
   let mockRefBNBBUSD: MockContract;
   let mockRefTOKENBNB: MockContract;
-  let mockRefTOKENBUSD: MockContract;
+  let mockRefTOKENUSD: MockContract;
   let tokenChainlinkAggregator: TokenChainlinkAggregator;
 
   beforeEach(async () => {
-    ({ simpleToken, wbnb, mockRefBNBBUSD, mockRefTOKENBNB, mockRefTOKENBUSD, tokenChainlinkAggregator } =
+    ({ simpleToken, wbnb, mockRefBNBBUSD, mockRefTOKENBNB, mockRefTOKENUSD, tokenChainlinkAggregator } =
       await waffle.loadFixture(tokenChainlinkAggregatorUnitTestFixture));
   });
 
@@ -33,16 +33,16 @@ describe("TokenChainlinkAggregator", () => {
         ).to.revertedWith("TokenChainlinkAggregator::latestAnswer::max delay time not set");
       });
     });
-    context("with existing ref bnb", () => {
+    context("with existing ref busd", () => {
       context("when updated at is >= delay threshold", () => {
         it("should return latest answer", async () => {
-          await tokenChainlinkAggregator.setRefBNB(mockRefTOKENBNB.address);
+          await tokenChainlinkAggregator.setRefUSD(mockRefTOKENUSD.address);
           const latestTimeStamp = await latestTimestamp();
           await tokenChainlinkAggregator.setMaxDelayTime(86400); //1 day delay, should be impossible to be less than this threshold
-
-          mockRefTOKENBNB.smocked.latestRoundData.will.return.with([
+          mockRefTOKENUSD.smocked.decimals.will.return.with(8);
+          mockRefTOKENUSD.smocked.latestRoundData.will.return.with([
             constants.Zero,
-            ethers.utils.parseEther("168"),
+            ethers.utils.parseUnits("168", 8),
             constants.Zero,
             latestTimeStamp,
             constants.Zero,
@@ -55,14 +55,14 @@ describe("TokenChainlinkAggregator", () => {
       });
       context("when updated at is < delay threshold", () => {
         it("should revert", async () => {
-          await tokenChainlinkAggregator.setRefBNB(mockRefTOKENBNB.address);
+          await tokenChainlinkAggregator.setRefUSD(mockRefTOKENUSD.address);
           const latestTimeStamp = await latestTimestamp();
           await tokenChainlinkAggregator.setMaxDelayTime(1); //1 day delay, should be impossible to be less than this threshold
           await increaseTimestamp(duration.seconds(BigNumber.from(2)));
-
-          mockRefTOKENBNB.smocked.latestRoundData.will.return.with([
+          mockRefTOKENUSD.smocked.decimals.will.return.with(8);
+          mockRefTOKENUSD.smocked.latestRoundData.will.return.with([
             constants.Zero,
-            ethers.utils.parseEther("168"),
+            ethers.utils.parseUnits("168", 8),
             constants.Zero,
             latestTimeStamp,
             constants.Zero,
@@ -76,21 +76,22 @@ describe("TokenChainlinkAggregator", () => {
       });
     });
 
-    context("with existing ref busd", () => {
+    context("with existing ref bnb", () => {
       context("when updated at is >= delay threshold", () => {
         it("should return latest answer", async () => {
-          await tokenChainlinkAggregator.setRefUSD(mockRefTOKENBUSD.address);
+          await tokenChainlinkAggregator.setRefBNB(mockRefTOKENBNB.address);
           const latestTimeStamp = await latestTimestamp();
           await tokenChainlinkAggregator.setMaxDelayTime(86400); //1 day delay, should be impossible to be less than this threshold
 
-          mockRefTOKENBUSD.smocked.latestRoundData.will.return.with([
+          mockRefTOKENBNB.smocked.decimals.will.return.with(18);
+          mockRefTOKENBNB.smocked.latestRoundData.will.return.with([
             constants.Zero,
-            ethers.utils.parseUnits("2000", 8),
+            ethers.utils.parseUnits("3", 18),
             constants.Zero,
             latestTimeStamp,
             constants.Zero,
           ]);
-
+          mockRefBNBBUSD.smocked.decimals.will.return.with(8);
           mockRefBNBBUSD.smocked.latestRoundData.will.return.with([
             constants.Zero,
             ethers.utils.parseUnits("400", 8),
@@ -100,26 +101,27 @@ describe("TokenChainlinkAggregator", () => {
           ]);
 
           expect(await tokenChainlinkAggregator.latestAnswer(), "should be equal to mocked latest round data").to.eq(
-            ethers.utils.parseEther("5")
+            ethers.utils.parseEther("1200")
           );
         });
       });
 
       context("when updated at is < delay threshold", () => {
         it("should revert", async () => {
-          await tokenChainlinkAggregator.setRefUSD(mockRefTOKENBUSD.address);
+          await tokenChainlinkAggregator.setRefBNB(mockRefTOKENBNB.address);
           const latestTimeStamp = await latestTimestamp();
           await tokenChainlinkAggregator.setMaxDelayTime(1); //1 day delay, should be impossible to be less than this threshold
           await increaseTimestamp(duration.seconds(BigNumber.from(2)));
 
-          mockRefTOKENBUSD.smocked.latestRoundData.will.return.with([
+          mockRefTOKENBNB.smocked.decimals.will.return.with(18);
+          mockRefTOKENBNB.smocked.latestRoundData.will.return.with([
             constants.Zero,
-            ethers.utils.parseUnits("2000", 8),
+            ethers.utils.parseUnits("3", 18),
             constants.Zero,
             latestTimeStamp,
             constants.Zero,
           ]);
-
+          mockRefBNBBUSD.smocked.decimals.will.return.with(8);
           mockRefBNBBUSD.smocked.latestRoundData.will.return.with([
             constants.Zero,
             ethers.utils.parseUnits("400", 8),
