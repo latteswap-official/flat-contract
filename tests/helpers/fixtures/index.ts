@@ -5,4 +5,5 @@ export * from "./Clerk";
 export * from "./CompositeOracle";
 export * from "./OffChainOracle";
 export * from "./PCSYieldStrategy";
+export * from "./FlatMarket";
 export * from "./LatteSwapLiquidationStrategy";
