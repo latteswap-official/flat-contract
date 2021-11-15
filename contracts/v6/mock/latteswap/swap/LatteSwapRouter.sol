@@ -10,8 +10,6 @@ import "./interfaces/ILatteSwapFactory.sol";
 import "./interfaces/ILatteSwapBEP20.sol";
 import "./interfaces/IWBNB.sol";
 
-import "hardhat/console.sol";
-
 contract LatteSwapRouter is ILatteSwapRouter {
   using LatteSwapSafeMath for uint256;
 
