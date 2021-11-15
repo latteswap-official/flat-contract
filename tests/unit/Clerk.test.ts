@@ -123,7 +123,7 @@ describe("Clerk", () => {
         0
       );
       const totalToken = await (clerk as unknown as Clerk).totals(stakingTokens[0].address);
-      await clerk.setVariable("totals", {
+      await clerk.setVariable("_totals", {
         [stakingTokens[0].address]: {
           amount: totalToken.amount.add(BigNumber.from(666)),
           share: totalToken.share,
@@ -322,7 +322,7 @@ describe("Clerk", () => {
 
     it("Mutates balanceOf and totalSupply for two deposits correctly", async function () {
       await stakingTokens[0].connect(alice).approve(clerkAsAlice.address, ethers.utils.parseEther("1200"));
-      await clerk.setVariable("totals", {
+      await clerk.setVariable("_totals", {
         [stakingTokens[0].address]: {
           amount: ethers.utils.parseEther("1300"),
           share: ethers.utils.parseEther("1000"),
@@ -408,7 +408,7 @@ describe("Clerk", () => {
     });
 
     it("Emits LogDeposit event with correct arguments", async function () {
-      await clerk.setVariable("totals", {
+      await clerk.setVariable("_totals", {
         [stakingTokens[0].address]: {
           amount: ethers.utils.parseEther("1000"),
           share: ethers.utils.parseEther("76"),
@@ -424,7 +424,7 @@ describe("Clerk", () => {
 
   describe("#deposit() - share", function () {
     it("allows for deposit of Share", async function () {
-      await clerk.setVariable("totals", {
+      await clerk.setVariable("_totals", {
         [stakingTokens[0].address]: {
           amount: ethers.utils.parseEther("4"),
           share: ethers.utils.parseEther("2"),
@@ -445,7 +445,7 @@ describe("Clerk", () => {
 
         await clerkAsAlice.deposit(stakingTokens[1].address, alice.address, alice.address, 0, 1);
 
-        await clerk.setVariable("totals", {
+        await clerk.setVariable("_totals", {
           [stakingTokens[1].address]: {
             amount: "2",
             share: "1",
@@ -471,7 +471,7 @@ describe("Clerk", () => {
     it("Mutates balanceOf and totalSupply correctly", async function () {
       await stakingTokens[0].connect(alice).approve(clerkAsAlice.address, ethers.utils.parseEther("100"));
 
-      await clerk.setVariable("totals", {
+      await clerk.setVariable("_totals", {
         [stakingTokens[0].address]: {
           amount: ethers.utils.parseEther("1300"),
           share: ethers.utils.parseEther("1000"),
@@ -599,7 +599,7 @@ describe("Clerk", () => {
       const startBal = await stakingTokens[0].balanceOf(alice.address);
       await stakingTokens[0].connect(alice).approve(clerkAsAlice.address, ethers.utils.parseEther("130"));
       await stakingTokens[0].connect(bob).approve(clerkAsAlice.address, ethers.utils.parseEther("260"));
-      await clerk.setVariable("totals", {
+      await clerk.setVariable("_totals", {
         [stakingTokens[0].address]: {
           amount: ethers.utils.parseEther("1300"),
           share: ethers.utils.parseEther("1000"),
@@ -886,163 +886,6 @@ describe("Clerk", () => {
           alice.address,
           [bob.address, carol.address],
           [computationalLimit.toString(), ethers.utils.parseEther("1")]
-        )
-      ).to.be.reverted;
-    });
-  });
-
-  describe("#flashLoan()", function () {
-    it("should revert on batch flashloan if not enough funds are available", async function () {
-      const param = clerkAsAlice.interface.encodeFunctionData("toShare", [stakingTokens[0].address, 1, false]);
-      await expect(
-        clerkAsAlice.batchFlashLoan(
-          flashloaner.address,
-          [flashloaner.address],
-          [stakingTokens[0].address],
-          [ethers.utils.parseEther("1")],
-          param
-        )
-      ).to.be.reverted;
-    });
-
-    it("should revert on flashloan if fee can not be paid", async function () {
-      await stakingTokens[0].transfer(clerkAsAlice.address, ethers.utils.parseEther("2"));
-      await stakingTokens[0].connect(alice).approve(clerkAsAlice.address, ethers.utils.parseEther("2"));
-      await clerkAsAlice.deposit(
-        stakingTokens[0].address,
-        alice.address,
-        alice.address,
-        ethers.utils.parseEther("1"),
-        0
-      );
-      const param = clerkAsAlice.interface.encodeFunctionData("toShare", [stakingTokens[0].address, 1, false]);
-      await expect(
-        clerkAsAlice.batchFlashLoan(
-          flashloaner.address,
-          [flashloaner.address],
-          [stakingTokens[0].address],
-          [ethers.utils.parseEther("1")],
-          param
-        )
-      ).to.be.reverted;
-    });
-
-    it("should revert on flashloan if amount is not paid back", async function () {
-      await stakingTokens[0].connect(alice).approve(clerkAsAlice.address, ethers.utils.parseEther("2"));
-      await clerkAsAlice.deposit(
-        stakingTokens[0].address,
-        alice.address,
-        alice.address,
-        ethers.utils.parseEther("1"),
-        0
-      );
-      const param = clerkAsAlice.interface.encodeFunctionData("toShare", [stakingTokens[0].address, 1, false]);
-      await expect(
-        clerkAsAlice.flashLoan(
-          evilFlashloaner.address,
-          evilFlashloaner.address,
-          stakingTokens[0].address,
-          ethers.utils.parseEther("1"),
-          param
-        )
-      ).to.be.revertedWith("Clerk::flashLoan:: Wrong amount");
-    });
-
-    it("should revert on batch flashloan if amount is not paid back", async function () {
-      await stakingTokens[0].connect(alice).approve(clerkAsAlice.address, ethers.utils.parseEther("2"));
-      await clerkAsAlice.deposit(
-        stakingTokens[0].address,
-        alice.address,
-        alice.address,
-        ethers.utils.parseEther("1"),
-        0
-      );
-      const param = clerkAsAlice.interface.encodeFunctionData("toShare", [stakingTokens[0].address, 1, false]);
-      await expect(
-        clerkAsAlice.batchFlashLoan(
-          evilFlashloaner.address,
-          [evilFlashloaner.address],
-          [stakingTokens[0].address],
-          [ethers.utils.parseEther("1")],
-          param
-        )
-      ).to.be.revertedWith("Clerk::batchFlashLoan:: Wrong amount");
-    });
-
-    it("should allow flashloan", async function () {
-      await stakingTokens[0].transfer(flashloaner.address, ethers.utils.parseEther("2"));
-      const maxLoan = (await stakingTokens[0].balanceOf(clerkAsAlice.address)).div(2);
-      await clerkAsAlice.flashLoan(flashloaner.address, flashloaner.address, stakingTokens[0].address, maxLoan, "0x");
-      expect(await clerkAsAlice.toAmount(stakingTokens[0].address, ethers.utils.parseEther("100"), false)).to.be.equal(
-        ethers.utils.parseEther("100").add(maxLoan.mul(5).div(10000))
-      );
-    });
-
-    it("revert on request to flashloan at vault protocol limit", async function () {
-      await stakingTokens[0].transfer(flashloaner.address, ethers.utils.parseEther("2"));
-      const maxLoan = vaultProtocolLimit.toString();
-      await expect(
-        clerkAsAlice.flashLoan(flashloaner.address, flashloaner.address, stakingTokens[0].address, maxLoan, "0x")
-      ).to.be.reverted;
-    });
-
-    it("revert on request to flashloan at computational limit", async function () {
-      await stakingTokens[0].transfer(flashloaner.address, ethers.utils.parseEther("2"));
-      const maxLoan = computationalLimit.toString();
-      await expect(
-        clerkAsAlice.flashLoan(flashloaner.address, flashloaner.address, stakingTokens[0].address, maxLoan, "0x")
-      ).to.be.reverted;
-    });
-
-    it("should allow flashloan with skimable amount on Flash", async function () {
-      await stakingTokens[0].transfer(flashloaner.address, ethers.utils.parseEther("2"));
-      await stakingTokens[0].transfer(clerkAsAlice.address, ethers.utils.parseEther("20"));
-      const maxLoan = ethers.utils.parseEther("2");
-      await clerkAsAlice.flashLoan(flashloaner.address, flashloaner.address, stakingTokens[0].address, maxLoan, "0x");
-      expect(await stakingTokens[0].balanceOf(clerkAsAlice.address)).to.be.equal(
-        ethers.utils.parseEther("20").add(maxLoan.mul(5).div(10000))
-      );
-    });
-
-    it("should allow batch flashloan", async function () {
-      await stakingTokens[0].transfer(flashloaner.address, ethers.utils.parseEther("2"));
-      const maxLoan = (await stakingTokens[0].balanceOf(clerkAsAlice.address)).div(2);
-      await clerkAsAlice.batchFlashLoan(
-        flashloaner.address,
-        [flashloaner.address],
-        [stakingTokens[0].address],
-        [maxLoan],
-        "0x"
-      );
-      expect(await clerkAsAlice.toAmount(stakingTokens[0].address, ethers.utils.parseEther("100"), false)).to.be.equal(
-        ethers.utils.parseEther("100").add(maxLoan.mul(5).div(10000))
-      );
-    });
-
-    it("revert on request to batch flashloan at vault protocol limit", async function () {
-      await stakingTokens[0].transfer(flashloaner.address, ethers.utils.parseEther("2"));
-      const maxLoan = vaultProtocolLimit.toString();
-      await expect(
-        clerkAsAlice.batchFlashLoan(
-          flashloaner.address,
-          [flashloaner.address],
-          [stakingTokens[0].address],
-          [maxLoan],
-          "0x"
-        )
-      ).to.be.reverted;
-    });
-
-    it("revert on request to batch flashloan at computational limit", async function () {
-      await stakingTokens[0].transfer(flashloaner.address, ethers.utils.parseEther("2"));
-      const maxLoan = computationalLimit.toString();
-      await expect(
-        clerkAsAlice.batchFlashLoan(
-          flashloaner.address,
-          [flashloaner.address],
-          [stakingTokens[0].address],
-          [maxLoan],
-          "0x"
         )
       ).to.be.reverted;
     });

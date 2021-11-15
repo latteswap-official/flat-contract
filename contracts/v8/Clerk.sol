@@ -6,7 +6,7 @@
   |__|¯¯'  |______| /___/¯|__'|  ¯|__|¯  
  */
 
-// This contract stores funds, handles their transfers, supports flash loans and yield trategies.
+// This contract stores funds, handles their transfers, supports yield trategies.
 
 pragma solidity 0.8.9;
 pragma experimental ABIEncoderV2;
@@ -17,10 +17,9 @@ import "@openzeppelin/contracts-upgradeable/utils/math/SafeCastUpgradeable.sol";
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-import "./interfaces/IFlashBorrower.sol";
-import "./interfaces/IBatchFlashBorrower.sol";
 import "./interfaces/IWBNB.sol";
 import "./interfaces/IStrategy.sol";
+import "./interfaces/IClerk.sol";
 
 import "./libraries/LatteConversion.sol";
 
@@ -31,13 +30,13 @@ import "./libraries/LatteConversion.sol";
 /// @notice The Clerk is the contract that act like a vault for managing funds.
 /// it is also capable of handling loans and strategies.
 /// Any funds transfered directly onto the Clerk will be LOST, use the deposit function instead.
-contract Clerk is OwnableUpgradeable {
+contract Clerk is IClerk, OwnableUpgradeable {
   using SafeERC20Upgradeable for IERC20Upgradeable;
   using SafeCastUpgradeable for uint256;
   using LatteConversion for Conversion;
 
   /// @notice market to whitelisted state for approval
-  mapping(address => bool) public whitelistedMarket;
+  mapping(address => bool) public override whitelistedMarkets;
   struct StrategyData {
     uint64 strategyStartDate;
     uint64 targetBps;
@@ -52,46 +51,13 @@ contract Clerk is OwnableUpgradeable {
   uint256 private constant MINIMUM_SHARE_BALANCE = 1000; // To prevent the ratio going off from tiny share
 
   // Balance per token per address/contract in shares
-  mapping(IERC20Upgradeable => mapping(address => uint256)) public balanceOf;
+  mapping(IERC20Upgradeable => mapping(address => uint256)) public override balanceOf;
 
   // Rebase from amount to share
-  mapping(IERC20Upgradeable => Conversion) public totals;
+  mapping(IERC20Upgradeable => Conversion) internal _totals;
 
-  mapping(IERC20Upgradeable => IStrategy) public strategy;
-  mapping(IERC20Upgradeable => StrategyData) public strategyData;
-
-  event LogDeposit(
-    IERC20Upgradeable indexed token,
-    address indexed from,
-    address indexed to,
-    uint256 amount,
-    uint256 share
-  );
-  event LogWithdraw(
-    IERC20Upgradeable indexed token,
-    address indexed from,
-    address indexed to,
-    uint256 amount,
-    uint256 share
-  );
-  event LogTransfer(IERC20Upgradeable indexed token, address indexed from, address indexed to, uint256 share);
-
-  event LogFlashLoan(
-    address indexed borrower,
-    IERC20Upgradeable indexed token,
-    uint256 amount,
-    uint256 feeAmount,
-    address indexed receiver
-  );
-
-  event LogStrategyTargetBps(IERC20Upgradeable indexed token, uint256 targetBps);
-  event LogStrategyQueued(IERC20Upgradeable indexed token, IStrategy indexed strategy);
-  event LogStrategySet(IERC20Upgradeable indexed token, IStrategy indexed strategy);
-  event LogStrategyDeposit(IERC20Upgradeable indexed token, uint256 amount);
-  event LogStrategyWithdraw(IERC20Upgradeable indexed token, uint256 amount);
-  event LogStrategyProfit(IERC20Upgradeable indexed token, uint256 amount);
-  event LogStrategyLoss(IERC20Upgradeable indexed token, uint256 amount);
-  event LogWhiteListMarket(address indexed market, bool approved);
+  mapping(IERC20Upgradeable => IStrategy) public override strategy;
+  mapping(IERC20Upgradeable => StrategyData) public override strategyData;
 
   function initialize(address _wbnbToken) public initializer {
     OwnableUpgradeable.__Ownable_init();
@@ -104,7 +70,7 @@ contract Clerk is OwnableUpgradeable {
   /// If 'from' is a whitelisted market, it would be allowed as well.
   modifier allowed(address _from) {
     if (_from != msg.sender) {
-      require(whitelistedMarket[msg.sender], "Clerk::allowed:: invalid market");
+      require(whitelistedMarkets[msg.sender], "Clerk::allowed:: invalid market");
     }
     _;
   }
@@ -113,6 +79,10 @@ contract Clerk is OwnableUpgradeable {
   /// plus the total amount this contract THINKS the strategy holds. (which is kept in strategyData)
   function _balanceOf(IERC20Upgradeable _token) internal view returns (uint256 amount) {
     amount = _token.balanceOf(address(this)) + (strategyData[_token].balance);
+  }
+
+  function totals(IERC20Upgradeable _token) external view returns (Conversion memory) {
+    return _totals[_token];
   }
 
   /// @dev wrap the token if the sent token is a native, otherwise just do safeTransferFrom
@@ -154,8 +124,8 @@ contract Clerk is OwnableUpgradeable {
     IERC20Upgradeable _token,
     uint256 _amount,
     bool _roundUp
-  ) external view returns (uint256 share) {
-    share = totals[_token].toShare(_amount, _roundUp);
+  ) external view override returns (uint256 share) {
+    share = _totals[_token].toShare(_amount, _roundUp);
   }
 
   /// @dev Helper function represent shares back into the `token` amount.
@@ -167,17 +137,17 @@ contract Clerk is OwnableUpgradeable {
     IERC20Upgradeable _token,
     uint256 _share,
     bool _roundUp
-  ) external view returns (uint256 amount) {
-    amount = totals[_token].toAmount(_share, _roundUp);
+  ) external view override returns (uint256 amount) {
+    amount = _totals[_token].toAmount(_share, _roundUp);
   }
 
   /// @notice Enables or disables a contract for approval
-  function whitelistMarket(address market, bool approved) public onlyOwner {
+  function whitelistMarket(address market, bool approved) public override onlyOwner {
     // Checks
     require(market != address(0), "MasterCMgr::whitelistMarket:: Cannot approve address 0");
 
     // Effects
-    whitelistedMarket[market] = approved;
+    whitelistedMarkets[market] = approved;
     emit LogWhiteListMarket(market, approved);
   }
 
@@ -195,13 +165,13 @@ contract Clerk is OwnableUpgradeable {
     address _to,
     uint256 _amount,
     uint256 _share
-  ) public payable allowed(_from) returns (uint256 _amountOut, uint256 _shareOut) {
+  ) public payable override allowed(_from) returns (uint256 _amountOut, uint256 _shareOut) {
     require(address(_token) != address(0), "Clerk::deposit:: token not set");
     require(_to != address(0), "Clerk::deposit:: to not set"); // To avoid a bad UI from burning funds
     // Harvest
     _harvest(_to, _token);
 
-    Conversion memory _total = totals[_token];
+    Conversion memory _total = _totals[_token];
     // If a new token gets added, the tokenSupply call checks that this is a deployed contract. Needed for security.
     require(_total.amount != 0 || _token.totalSupply() > 0, "Clerk::deposit:: No tokens");
     if (_share == 0) {
@@ -218,7 +188,7 @@ contract Clerk is OwnableUpgradeable {
     balanceOf[_token][_to] = balanceOf[_token][_to] + _share;
     _total.share = _total.share + _share.toUint128();
     _total.amount = _total.amount + _amount.toUint128();
-    totals[_token] = _total;
+    _totals[_token] = _total;
 
     _safeWrap(_from, _token, _amount);
     // does house keeping, either deposit or withdraw
@@ -241,14 +211,14 @@ contract Clerk is OwnableUpgradeable {
     address _to,
     uint256 _amount,
     uint256 _share
-  ) public allowed(_from) returns (uint256 _amountOut, uint256 _shareOut) {
+  ) public override allowed(_from) returns (uint256 _amountOut, uint256 _shareOut) {
     require(address(_token) != address(0), "Clerk::withdraw:: token not set");
     require(_to != address(0), "Clerk::withdraw:: to not set"); // To avoid a bad UI from burning funds
 
     // Harvest
     _harvest(_from, _token);
 
-    Conversion memory _total = totals[_token];
+    Conversion memory _total = _totals[_token];
     if (_share == 0) {
       // value of the share paid could be lower than the amount paid due to rounding, in that case, add a share (Always round up)
       _share = _total.toShare(_amount, true);
@@ -262,7 +232,7 @@ contract Clerk is OwnableUpgradeable {
     _total.share = _total.share - _share.toUint128();
     // There have to be at least 1000 shares left to prevent reseting the share/amount ratio (unless it's fully emptied)
     require(_total.share >= MINIMUM_SHARE_BALANCE || _total.share == 0, "Clerk::withdraw:: cannot empty");
-    totals[_token] = _total;
+    _totals[_token] = _total;
 
     // does house keeping, either deposit or withdraw
     _houseKeeping(_from, _token);
@@ -284,7 +254,7 @@ contract Clerk is OwnableUpgradeable {
     address _from,
     address _to,
     uint256 _share
-  ) public allowed(_from) {
+  ) public override allowed(_from) {
     require(_to != address(0), "Clerk::transfer:: to not set"); // To avoid a bad UI from burning funds
 
     // Harvest reward (if any) for _from and _to
@@ -307,7 +277,7 @@ contract Clerk is OwnableUpgradeable {
     address _from,
     address[] calldata _tos,
     uint256[] calldata _shares
-  ) public allowed(_from) {
+  ) public override allowed(_from) {
     require(_tos[0] != address(0), "Clerk::transferMultiple:: to[0] not set"); // To avoid a bad UI from burning funds
 
     uint256 _totalAmount;
@@ -325,68 +295,11 @@ contract Clerk is OwnableUpgradeable {
     balanceOf[_token][_from] = balanceOf[_token][_from] - _totalAmount;
   }
 
-  /// @notice Flashloan ability.
-  /// @param _borrower The address of the contract that implements and conforms to `IFlashBorrower` and handles the flashloan.
-  /// @param _receiver Address of the token receiver.
-  /// @param _token The address of the token to receive.
-  /// @param _amount of the tokens to receive.
-  /// @param _data The calldata to pass to the `borrower` contract.
-  function flashLoan(
-    IFlashBorrower _borrower,
-    address _receiver,
-    IERC20Upgradeable _token,
-    uint256 _amount,
-    bytes calldata _data
-  ) public {
-    uint256 _fee = (_amount * FLASH_LOAN_FEE) / FLASH_LOAN_FEE_PRECISION;
-    _token.safeTransfer(_receiver, _amount);
-
-    _borrower.onFlashLoan(msg.sender, _token, _amount, _fee, _data);
-
-    require(_balanceOf(_token) >= totals[_token].addAmount(_fee.toUint128()), "Clerk::flashLoan:: Wrong amount");
-    emit LogFlashLoan(address(_borrower), _token, _amount, _fee, _receiver);
-  }
-
-  /// @notice Support for batched flashloans. Useful to request multiple different `tokens` in a single transaction.
-  /// @param _borrower The address of the contract that implements and conforms to `IBatchFlashBorrower` and handles the flashloan.
-  /// @param _receivers An array of the token receivers. A one-to-one mapping with `tokens` and `amounts`.
-  /// @param _tokens The addresses of the tokens.
-  /// @param _amounts of the tokens for each receiver.
-  /// @param _data The calldata to pass to the `borrower` contract.
-  function batchFlashLoan(
-    IBatchFlashBorrower _borrower,
-    address[] calldata _receivers,
-    IERC20Upgradeable[] calldata _tokens,
-    uint256[] calldata _amounts,
-    bytes calldata _data
-  ) public {
-    uint256[] memory _fees = new uint256[](_tokens.length);
-
-    uint256 _len = _tokens.length;
-    for (uint256 i = 0; i < _len; i++) {
-      uint256 _amount = _amounts[i];
-      _fees[i] = (_amount * FLASH_LOAN_FEE) / FLASH_LOAN_FEE_PRECISION;
-
-      _tokens[i].safeTransfer(_receivers[i], _amounts[i]);
-    }
-
-    _borrower.onBatchFlashLoan(msg.sender, _tokens, _amounts, _fees, _data);
-
-    for (uint256 i = 0; i < _len; i++) {
-      IERC20Upgradeable token = _tokens[i];
-      require(
-        _balanceOf(token) >= totals[token].addAmount(_fees[i].toUint128()),
-        "Clerk::batchFlashLoan:: Wrong amount"
-      );
-      emit LogFlashLoan(address(_borrower), token, _amounts[i], _fees[i], _receivers[i]);
-    }
-  }
-
   /// @notice Sets the target percentage of the strategy for `token`.
   /// @dev Only the owner of this contract is allowed to change this.
   /// @param _token The address of the token that maps to a strategy to change.
   /// @param _targetBps The new target in percent. Must be lesser or equal to `MAX_TARGET_BPS`.
-  function setStrategyTargetBps(IERC20Upgradeable _token, uint64 _targetBps) public onlyOwner {
+  function setStrategyTargetBps(IERC20Upgradeable _token, uint64 _targetBps) public override onlyOwner {
     require(_targetBps <= MAX_TARGET_BPS, "Clerk::setStrategyTargetBps:: Target too high");
 
     strategyData[_token].targetBps = _targetBps;
@@ -396,17 +309,17 @@ contract Clerk is OwnableUpgradeable {
   /// @notice Sets the contract address of a new strategy that conforms to `IStrategy` for `token`.
   /// @param _token The address of the token that maps to a strategy to change.
   /// @param _newStrategy The address of the contract that conforms to `IStrategy`.
-  function setStrategy(IERC20Upgradeable _token, IStrategy _newStrategy) public onlyOwner {
+  function setStrategy(IERC20Upgradeable _token, IStrategy _newStrategy) public override onlyOwner {
     StrategyData memory _data = strategyData[_token];
     if (address(strategy[_token]) != address(0)) {
       int256 _balanceChange = strategy[_token].exit(_data.balance);
       if (_balanceChange > 0) {
         uint256 _add = uint256(_balanceChange);
-        totals[_token].addAmount(_add);
+        _totals[_token].addAmount(_add);
         emit LogStrategyProfit(_token, _add);
       } else if (_balanceChange < 0) {
         uint256 _sub = uint256(-_balanceChange);
-        totals[_token].subAmount(_sub);
+        _totals[_token].subAmount(_sub);
         emit LogStrategyLoss(_token, _sub);
       }
 
@@ -420,12 +333,12 @@ contract Clerk is OwnableUpgradeable {
 
   /// @notice The actual process of yield farming. Executes the strategy of `token`.
   /// @param _token The address of the token for which a strategy is deployed.
-  function harvest(IERC20Upgradeable _token) public {
+  function harvest(IERC20Upgradeable _token) public override {
     _harvest(msg.sender, _token);
   }
 
   /// @notice Function for harvesting with specific tokens
-  function harvest(IERC20Upgradeable[] memory _tokens) public {
+  function harvest(IERC20Upgradeable[] memory _tokens) public override {
     uint256 _len = _tokens.length;
     for (uint256 i = 0; i < _len; i++) {
       _harvest(msg.sender, _tokens[i]);
@@ -437,25 +350,25 @@ contract Clerk is OwnableUpgradeable {
     IStrategy _strategy = strategy[_token];
     if (address(_strategy) == address(0)) return;
     int256 _balanceChange = _strategy.harvest(
-      abi.encode(_data.balance, _sender, totals[_token].share, balanceOf[_token][_sender])
+      abi.encode(_data.balance, _sender, _totals[_token].share, balanceOf[_token][_sender])
     );
 
     if (_balanceChange == 0) {
       return;
     }
 
-    uint256 _totalAmount = totals[_token].amount;
+    uint256 _totalAmount = _totals[_token].amount;
 
     // if there is a balance from harvest, add it to amount, thus making 1 share = 1 +- balanceChange amount
     if (_balanceChange > 0) {
       uint256 _add = uint256(_balanceChange);
       _totalAmount = _totalAmount + _add;
-      totals[_token].amount = _totalAmount.toUint128();
+      _totals[_token].amount = _totalAmount.toUint128();
       emit LogStrategyProfit(_token, _add);
     } else if (_balanceChange < 0) {
       uint256 _sub = uint256(-_balanceChange);
       _totalAmount = _totalAmount - _sub;
-      totals[_token].amount = _totalAmount.toUint128();
+      _totals[_token].amount = _totalAmount.toUint128();
       _data.balance = _data.balance - _sub.toUint128();
       emit LogStrategyLoss(_token, _sub);
     }
@@ -470,7 +383,7 @@ contract Clerk is OwnableUpgradeable {
 
     if (address(_strategy) == address(0)) return;
 
-    uint256 _totalAmount = totals[_token].amount;
+    uint256 _totalAmount = _totals[_token].amount;
 
     uint256 _targetBalance = (_totalAmount * _data.targetBps) / 1e4;
 
@@ -480,14 +393,14 @@ contract Clerk is OwnableUpgradeable {
 
       _token.safeTransfer(address(_strategy), _amountOut);
       _data.balance = _data.balance + _amountOut.toUint128();
-      _strategy.deposit(abi.encode(_amountOut, _sender, totals[_token].share, balanceOf[_token][_sender]));
+      _strategy.deposit(abi.encode(_amountOut, _sender, _totals[_token].share, balanceOf[_token][_sender]));
 
       emit LogStrategyDeposit(_token, _amountOut);
     } else if (_data.balance > _targetBalance) {
       uint256 _amountIn = _data.balance - _targetBalance.toUint128();
 
       uint256 _actualAmountIn = _strategy.withdraw(
-        abi.encode(_amountIn, _sender, totals[_token].share, balanceOf[_token][_sender])
+        abi.encode(_amountIn, _sender, _totals[_token].share, balanceOf[_token][_sender])
       );
 
       _data.balance = _data.balance - _actualAmountIn.toUint128();

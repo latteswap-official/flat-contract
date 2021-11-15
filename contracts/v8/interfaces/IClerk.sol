@@ -11,44 +11,35 @@ pragma experimental ABIEncoderV2;
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 import "../libraries/LatteConversion.sol";
-import "./IBatchFlashBorrower.sol";
-import "./IFlashBorrower.sol";
 import "./IStrategy.sol";
 
+/// @title Latte Batch Flash Borrower interface
 interface IClerk {
-  event LogDeposit(address indexed token, address indexed from, address indexed to, uint256 amount, uint256 share);
-  event LogFlashLoan(
-    address indexed borrower,
-    address indexed token,
+  event LogDeposit(
+    IERC20Upgradeable indexed token,
+    address indexed from,
+    address indexed to,
     uint256 amount,
-    uint256 feeAmount,
-    address indexed receiver
+    uint256 share
   );
-  event LogRegisterProtocol(address indexed protocol);
-  event LogSetMasterContractApproval(address indexed masterContract, address indexed user, bool approved);
-  event LogStrategyDivest(address indexed token, uint256 amount);
-  event LogStrategyInvest(address indexed token, uint256 amount);
-  event LogStrategyLoss(address indexed token, uint256 amount);
-  event LogStrategyProfit(address indexed token, uint256 amount);
-  event LogStrategyQueued(address indexed token, address indexed strategy);
-  event LogStrategySet(address indexed token, address indexed strategy);
-  event LogStrategyTargetPercentage(address indexed token, uint256 targetPercentage);
-  event LogTransfer(address indexed token, address indexed from, address indexed to, uint256 share);
-  event LogWhiteListMasterContract(address indexed masterContract, bool approved);
-  event LogWithdraw(address indexed token, address indexed from, address indexed to, uint256 amount, uint256 share);
-  event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+  event LogWithdraw(
+    IERC20Upgradeable indexed token,
+    address indexed from,
+    address indexed to,
+    uint256 amount,
+    uint256 share
+  );
+  event LogTransfer(IERC20Upgradeable indexed token, address indexed from, address indexed to, uint256 share);
+  event LogStrategyTargetBps(IERC20Upgradeable indexed token, uint256 targetBps);
+  event LogStrategyQueued(IERC20Upgradeable indexed token, IStrategy indexed strategy);
+  event LogStrategySet(IERC20Upgradeable indexed token, IStrategy indexed strategy);
+  event LogStrategyDeposit(IERC20Upgradeable indexed token, uint256 amount);
+  event LogStrategyWithdraw(IERC20Upgradeable indexed token, uint256 amount);
+  event LogStrategyProfit(IERC20Upgradeable indexed token, uint256 amount);
+  event LogStrategyLoss(IERC20Upgradeable indexed token, uint256 amount);
+  event LogWhiteListMarket(address indexed market, bool approved);
 
   function balanceOf(IERC20Upgradeable, address) external view returns (uint256);
-
-  function batchFlashLoan(
-    IBatchFlashBorrower borrower,
-    address[] calldata receivers,
-    IERC20Upgradeable[] calldata tokens,
-    uint256[] calldata amounts,
-    bytes calldata data
-  ) external;
-
-  function claimOwnership() external;
 
   function deposit(
     IERC20Upgradeable token_,
@@ -58,46 +49,13 @@ interface IClerk {
     uint256 share
   ) external payable returns (uint256 amountOut, uint256 shareOut);
 
-  function flashLoan(
-    IFlashBorrower borrower,
-    address receiver,
-    IERC20Upgradeable token,
-    uint256 amount,
-    bytes calldata data
-  ) external;
+  function harvest(IERC20Upgradeable token) external;
 
-  function harvest(
-    IERC20Upgradeable token,
-    bool balance,
-    uint256 maxChangeAmount
-  ) external;
-
-  function masterContractApproved(address, address) external view returns (bool);
-
-  function masterContractOf(address) external view returns (address);
-
-  function nonces(address) external view returns (uint256);
-
-  function owner() external view returns (address);
-
-  function pendingOwner() external view returns (address);
-
-  function pendingStrategy(IERC20Upgradeable) external view returns (IStrategy);
-
-  function registerProtocol() external;
-
-  function setMasterContractApproval(
-    address user,
-    address masterContract,
-    bool approved,
-    uint8 v,
-    bytes32 r,
-    bytes32 s
-  ) external;
+  function harvest(IERC20Upgradeable[] memory tokens) external;
 
   function setStrategy(IERC20Upgradeable token, IStrategy newStrategy) external;
 
-  function setStrategyTargetPercentage(IERC20Upgradeable token, uint64 targetPercentage_) external;
+  function setStrategyTargetBps(IERC20Upgradeable token, uint64 targetBps) external;
 
   function strategy(IERC20Upgradeable) external view returns (IStrategy);
 
@@ -106,7 +64,7 @@ interface IClerk {
     view
     returns (
       uint64 strategyStartDate,
-      uint64 targetPercentage,
+      uint64 targetBps,
       uint128 balance
     );
 
@@ -122,7 +80,7 @@ interface IClerk {
     bool roundUp
   ) external view returns (uint256 share);
 
-  function totals(IERC20Upgradeable) external view returns (Conversion memory totals_);
+  function totals(IERC20Upgradeable) external view returns (Conversion memory _totals);
 
   function transfer(
     IERC20Upgradeable token,
@@ -138,15 +96,9 @@ interface IClerk {
     uint256[] calldata shares
   ) external;
 
-  function transferOwnership(
-    address newOwner,
-    bool direct,
-    bool renounce
-  ) external;
+  function whitelistMarket(address market, bool approved) external;
 
-  function whitelistMasterContract(address masterContract, bool approved) external;
-
-  function whitelistedMasterContracts(address) external view returns (bool);
+  function whitelistedMarkets(address) external view returns (bool);
 
   function withdraw(
     IERC20Upgradeable token_,
