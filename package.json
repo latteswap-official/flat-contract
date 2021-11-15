@@ -16,6 +16,7 @@
     "test:integrations:flatMarket": "hardhat test --no-compile ./tests/integrations/FlatMarket.test.ts",
     "test:integrations:flatMarketConfig": "hardhat test --no-compile ./tests/integrations/FlatMarketConfig.test.ts",
     "test:integrations:latteSwapLiquidateStrategy": "hardhat test --no-compile ./tests/integrations/LatteSwapLiquidateStrategy.test.ts",
+    "test:unit:flat": "hardhat test --no-compile ./tests/unit/Flat.test.ts",
     "test:unit:flatMarket": "hardhat test --no-compile ./tests/unit/FlatMarket.test.ts",
     "test:unit:tokenChainlinkAggregator": "hardhat test --no-compile ./tests/unit/TokenChainlinkAggregator.test.ts",
     "test:unit:lpChainlinkAggregator": "hardhat test --no-compile ./tests/unit/LPChainlinkAggregator.test.ts",

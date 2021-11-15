@@ -1679,7 +1679,7 @@ describe("FlatMarket", () => {
           expect(await usdcUsdtLpMarket.totalDebtValue()).to.be.eq(totalDebtValue);
         });
 
-        context("when liquidator try to kill both Bob and Alice", async () => {
+        context("when liquidator fully kill both Bob and Alice", async () => {
           it("should only kill Bob's position", async () => {
             const aliceDebtShareBefore = await usdcUsdtLpMarket.userDebtShare(aliceAddress);
             const aliceCollateralBefore = await usdcUsdtLpMarket.userCollateralShare(aliceAddress);
@@ -1763,6 +1763,86 @@ describe("FlatMarket", () => {
             expect(treasuryFlatAfter.sub(treasuryFlatBefore)).to.be.eq(accruedInterest.add(liquidationFee));
           });
         });
+
+        context("when liquidator partially kill Bob", async () => {
+          it("should only settle debt that liquidator liquidate", async () => {
+            const bobDebtShareBefore = await usdcUsdtLpMarket.userDebtShare(bobAddress);
+            const bobCollateralBefore = await usdcUsdtLpMarket.userCollateralShare(bobAddress);
+            const catFlatBefore = await clerk.balanceOf(flat.address, catAddress);
+            const liquidateDebtShare = bobDebtShareBefore.div(2);
+            await usdcUsdtLpMarketAsCat.kill(
+              [bobAddress],
+              [liquidateDebtShare],
+              catAddress,
+              ethers.constants.AddressZero
+            );
+            stages["catKill"] = await timeHelpers.latestTimestamp();
+            const bobDebtShareAfter = await usdcUsdtLpMarket.userDebtShare(bobAddress);
+            const bobCollateralAfter = await usdcUsdtLpMarket.userCollateralShare(bobAddress);
+            const catFlatAfter = await clerk.balanceOf(flat.address, catAddress);
+            // Calculate totalDebtValue at accrue
+            let interest = calculateAccruedInterest(
+              stages["catDeposit"],
+              stages["catKill"],
+              totalDebtValue,
+              INTEREST_PER_SECOND
+            );
+            accruedInterest = accruedInterest.add(interest);
+            totalDebtValue = totalDebtValue.add(interest);
+            // Calculate Bob's debt value to be removed, it should take all Bob's collateral
+            const bobDebtValue = debtHelpers.debtShareToValue(
+              liquidateDebtShare,
+              totalDebtShare,
+              totalDebtValue,
+              false
+            );
+            // Calculate totalDebtShare when debt is removed from Bob
+            totalDebtShare = totalDebtShare.sub(liquidateDebtShare);
+            // Calculate totalDebtValue after Bob's position is killed
+            totalDebtValue = totalDebtValue.sub(bobDebtValue);
+            // Calculate collateral to be taken from Bob
+            const liquidatedCollateral = bobDebtValue
+              .mul(LIQUIDATION_PENALTY)
+              .mul(ethers.constants.WeiPerEther)
+              .div(collateralPrice.mul(1e4));
+            // Calculate liquidation fee
+            const liquidationFee = bobDebtValue
+              .mul(LIQUIDATION_PENALTY)
+              .div(1e4)
+              .sub(bobDebtValue)
+              .mul(LIQUIDATION_TREASURY_BPS)
+              .div(1e4);
+
+            // Expect that totalDebtValue and totalDebtShare must correct
+            expect(await usdcUsdtLpMarket.totalDebtShare()).to.be.eq(totalDebtShare);
+            expect(await usdcUsdtLpMarket.totalDebtValue()).to.be.eq(totalDebtValue);
+
+            expect(bobDebtShareAfter).to.be.eq(bobDebtShareBefore.sub(liquidateDebtShare));
+            expect(bobCollateralBefore.sub(bobCollateralAfter)).to.be.eq(liquidatedCollateral);
+            expect(await usdcUsdtLpMarket.liquidationFee()).to.be.eq(liquidationFee);
+            expect(await usdcUsdtLpMarket.surplus()).to.be.eq(accruedInterest);
+            expect(catFlatBefore.sub(catFlatAfter)).to.be.eq(bobDebtValue.add(liquidationFee));
+
+            // Treasury withdraw surplus, expect to get both accruedInterest and liquidation fee
+            const treasuryFlatBefore = await clerk.balanceOf(flat.address, deployerAddress);
+            await usdcUsdtLpMarket.withdrawSurplus();
+            stages["withdrawSurplus"] = await timeHelpers.latestTimestamp();
+            // Calculate totalDebtValue at accrue
+            interest = calculateAccruedInterest(
+              stages["catKill"],
+              stages["withdrawSurplus"],
+              totalDebtValue,
+              INTEREST_PER_SECOND
+            );
+            accruedInterest = accruedInterest.add(interest);
+            totalDebtValue = totalDebtValue.add(interest);
+            const treasuryFlatAfter = await clerk.balanceOf(flat.address, deployerAddress);
+            expect(await usdcUsdtLpMarket.surplus()).to.be.eq(0);
+            expect(await usdcUsdtLpMarket.liquidationFee()).to.be.eq(0);
+            expect(await usdcUsdtLpMarket.totalDebtValue()).to.be.eq(totalDebtValue);
+            expect(treasuryFlatAfter.sub(treasuryFlatBefore)).to.be.eq(accruedInterest.add(liquidationFee));
+          });
+        });
       });
 
       context("when Bob's position is bad debt", async () => {
@@ -1800,7 +1880,7 @@ describe("FlatMarket", () => {
           expect(await usdcUsdtLpMarket.totalDebtValue()).to.be.eq(totalDebtValue);
         });
 
-        context("when liquidator try to kill both Bob and Alice", async () => {
+        context("when liquidator try to fully kill both Bob and Alice", async () => {
           it("should only kill Bob's position and liquidator should take all collateral", async () => {
             const aliceDebtShareBefore = await usdcUsdtLpMarket.userDebtShare(aliceAddress);
             const aliceCollateralBefore = await usdcUsdtLpMarket.userCollateralShare(aliceAddress);
@@ -1828,8 +1908,8 @@ describe("FlatMarket", () => {
             // Calculate expected debtShare to be taken from Bob
             const bobTakenDebtValue = bobCollateralAmount
               .mul(collateralPrice)
-              .mul(ethers.BigNumber.from(2e4).sub(LIQUIDATION_PENALTY))
-              .div(ethers.constants.WeiPerEther.mul(1e4));
+              .mul(1e4)
+              .div(ethers.constants.WeiPerEther.mul(LIQUIDATION_PENALTY));
             const bobTakenDebtShare = debtHelpers.debtValueToShare(
               bobTakenDebtValue,
               totalDebtShare,
@@ -1858,6 +1938,94 @@ describe("FlatMarket", () => {
             expect(await usdcUsdtLpMarket.liquidationFee()).to.be.eq(liquidationFee);
             expect(await usdcUsdtLpMarket.userDebtShare(deployerAddress)).to.be.eq(
               bobDebtShareBefore.sub(bobTakenDebtShare)
+            );
+
+            // Treasury withdraw surplus, expect to get both accruedInterest and liquidation fee
+            const treasuryFlatBefore = await clerk.balanceOf(flat.address, deployerAddress);
+            await usdcUsdtLpMarket.withdrawSurplus();
+            stages["withdrawSurplus"] = await timeHelpers.latestTimestamp();
+            // Calculate totalDebtValue at accrue
+            interest = calculateAccruedInterest(
+              stages["catKill"],
+              stages["withdrawSurplus"],
+              totalDebtValue,
+              INTEREST_PER_SECOND
+            );
+            accruedInterest = accruedInterest.add(interest);
+            totalDebtValue = totalDebtValue.add(interest);
+            const treasuryFlatAfter = await clerk.balanceOf(flat.address, deployerAddress);
+            expect(await usdcUsdtLpMarket.surplus()).to.be.eq(0);
+            expect(await usdcUsdtLpMarket.liquidationFee()).to.be.eq(0);
+            expect(await usdcUsdtLpMarket.totalDebtValue()).to.be.eq(totalDebtValue);
+            expect(treasuryFlatAfter.sub(treasuryFlatBefore)).to.be.eq(accruedInterest.add(liquidationFee));
+          });
+        });
+
+        context("when liquidator try to partially kill Bob and left dust", async () => {
+          it("should make liquidator to take all collateral", async () => {
+            // Calculate expected debtShare to be taken from Bob
+            const bobTakenDebtValue = bobCollateralAmount
+              .mul(collateralPrice)
+              .mul(1e4)
+              .div(LIQUIDATION_PENALTY.mul(ethers.constants.WeiPerEther));
+            // Calculate bobTakenDebtShare by a given bobTokenDebtValue
+            // Need to minus dust to make dust happened
+            const bobTakenDebtShare = debtHelpers
+              .debtValueToShare(bobTakenDebtValue, totalDebtShare, totalDebtValue, true)
+              .sub(ethers.utils.parseEther("0.1"));
+
+            const aliceDebtShareBefore = await usdcUsdtLpMarket.userDebtShare(aliceAddress);
+            const aliceCollateralBefore = await usdcUsdtLpMarket.userCollateralShare(aliceAddress);
+            const bobDebtShareBefore = await usdcUsdtLpMarket.userDebtShare(bobAddress);
+            await usdcUsdtLpMarketAsCat.kill(
+              [bobAddress],
+              [bobTakenDebtShare],
+              catAddress,
+              ethers.constants.AddressZero
+            );
+            stages["catKill"] = await timeHelpers.latestTimestamp();
+            const aliceDebtShareAfter = await usdcUsdtLpMarket.userDebtShare(aliceAddress);
+            const aliceCollateralAfter = await usdcUsdtLpMarket.userCollateralShare(aliceAddress);
+            const bobDebtShareAfter = await usdcUsdtLpMarket.userDebtShare(bobAddress);
+            const bobCollateralAfter = await usdcUsdtLpMarket.userCollateralShare(bobAddress);
+            // Calculate totalDebtValue at accrue
+            let interest = calculateAccruedInterest(
+              stages["catDeposit"],
+              stages["catKill"],
+              totalDebtValue,
+              INTEREST_PER_SECOND
+            );
+            accruedInterest = accruedInterest.add(interest);
+            totalDebtValue = totalDebtValue.add(interest);
+            // Calculate expected debtShare to be taken from Bob
+            const bobActualTakenDebtShare = debtHelpers.debtValueToShare(
+              bobTakenDebtValue,
+              totalDebtShare,
+              totalDebtValue,
+              true
+            );
+            const liquidationFee = bobTakenDebtValue
+              .mul(LIQUIDATION_PENALTY)
+              .div(1e4)
+              .sub(bobTakenDebtValue)
+              .mul(LIQUIDATION_TREASURY_BPS)
+              .div(1e4);
+            // Calculate totalDebtShare when debt is removed from Bob
+            totalDebtShare = totalDebtShare.sub(bobActualTakenDebtShare);
+            // Calculate totalDebtValue after Bob's position is killed
+            totalDebtValue = totalDebtValue.sub(bobTakenDebtValue);
+            // Expect that totalDebtValue and totalDebtShare must correct
+            expect(await usdcUsdtLpMarket.totalDebtShare()).to.be.eq(totalDebtShare);
+            expect(await usdcUsdtLpMarket.totalDebtValue()).to.be.eq(totalDebtValue);
+
+            expect(aliceDebtShareAfter).to.be.eq(aliceDebtShareBefore);
+            expect(aliceCollateralBefore).to.be.eq(aliceCollateralAfter);
+            expect(bobDebtShareAfter).to.be.eq(0);
+            expect(bobCollateralAfter).to.be.eq(0);
+            expect(await usdcUsdtLpMarket.surplus()).to.be.eq(accruedInterest);
+            expect(await usdcUsdtLpMarket.liquidationFee()).to.be.eq(liquidationFee);
+            expect(await usdcUsdtLpMarket.userDebtShare(deployerAddress)).to.be.eq(
+              bobDebtShareBefore.sub(bobActualTakenDebtShare)
             );
 
             // Treasury withdraw surplus, expect to get both accruedInterest and liquidation fee

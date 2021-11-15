@@ -23,8 +23,6 @@ import "./interfaces/IFlatMarketConfig.sol";
 
 import "./FLAT.sol";
 
-import "hardhat/console.sol";
-
 /// @title FlatMarket - A place where fellow baristas come and get their FLAT.
 // solhint-disable not-rely-on-time
 contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
@@ -396,7 +394,6 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     address _to,
     IFlashLiquidateStrategy _flashLiquidateStrategy
   ) public nonReentrant accrue {
-    console.log("====== kill =======");
     // 1. Load required config
     uint256 _liquidationPenalty = marketConfig.liquidationPenalty(address(this));
     uint256 _liquidationTreasuryBps = marketConfig.liquidationTreasuryBps(address(this));
@@ -407,30 +404,23 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     // 2. Force update collateral price
     (, uint256 _collateralPrice) = updateCollateralPrice();
 
-    console.log("_collateralPrice: ", _collateralPrice);
-
     // 3. Prepare variables
     uint256 _sumCollateralShare = 0;
     uint256 _sumDebtAmount = 0;
     uint256 _sumDebtShare = 0;
-    Conversion memory _flatVaultTotals = clerk.totals(collateral);
+    Conversion memory _clerkTotals = clerk.totals(collateral);
 
     // 4. Loop-through all users to check if we are able to liquidate
     for (uint256 i = 0; i < _users.length; i++) {
       address _user = _users[i];
-      console.log("> liquidating ", _user);
       // 4.1. If user position not safe, then can liquidate
       if (!_checkSafe(_user, _collateralPrice)) {
-        console.log("> position not safe");
-        console.log("> _userDebtShare: ", userDebtShare[_user]);
         // 4.1.1. Findout how much debt share to liquidate
         uint256 _lessDebtShare = MathUpgradeable.min(_maxDebtShares[i], userDebtShare[_user]);
-        console.log("> _lessDebtShare: ", _lessDebtShare);
         // 4.1.2. Convert debt share to FLAT value
         uint256 _borrowAmount = debtShareToValue(_lessDebtShare, false);
         // 4.1.3. Calculate collateral share to be taken out by liquidator
-        console.log("> _borrowAmount: ", _borrowAmount);
-        uint256 _collateralShare = _flatVaultTotals.toShare(
+        uint256 _collateralShare = _clerkTotals.toShare(
           (_borrowAmount * _liquidationPenalty * COLLATERAL_PRICE_PRECISION) / (BPS_PRECISION * _collateralPrice),
           false
         );
@@ -439,10 +429,10 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         // Need to recalculate _lessDebtShare and _borrowAmount as well.
         if (
           _collateralShare > userCollateralShare[_user] ||
-          clerk.toAmount(collateral, userCollateralShare[_user], false) * _collateralPrice <
+          ((_clerkTotals.toAmount(userCollateralShare[_user] - _collateralShare, false) * _collateralPrice) /
+            COLLATERAL_PRICE_PRECISION) <
           marketConfig.minDebtSize(address(this))
         ) {
-          console.log("> take all collateral");
           // Take out all collateral
           _collateralShare = userCollateralShare[_user];
           userCollateralShare[_user] = 0;
@@ -451,11 +441,9 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
           // borrowAmount should be discounted instead of discount on collateral.
           // Round debtShare up to make sure it is not zero if borrowAmount is tiny.
           _borrowAmount =
-            (clerk.toAmount(collateral, _collateralShare, false) * _collateralPrice * (2e4 - _liquidationPenalty)) /
-            (COLLATERAL_PRICE_PRECISION * BPS_PRECISION);
+            (clerk.toAmount(collateral, _collateralShare, false) * _collateralPrice * BPS_PRECISION) /
+            (COLLATERAL_PRICE_PRECISION * _liquidationPenalty);
           _lessDebtShare = debtValueToShare(_borrowAmount, true);
-          console.log("> _borrowAmount: ", _borrowAmount);
-          console.log("> _lessDebtShare: ", _lessDebtShare);
         } else {
           userCollateralShare[_user] = userCollateralShare[_user] - _collateralShare;
         }

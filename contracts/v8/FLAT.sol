@@ -23,7 +23,7 @@ contract FLAT is ERC20("FLAT", "FLAT"), Ownable {
   event LogSetCoolDown(uint256 _prevCoolDown, uint256 _newCoolDown);
 
   /// @dev Constant
-  uint256 private constant BPS_PRECISION = 1e5;
+  uint256 private constant BPS_PRECISION = 1e4;
 
   /// @dev Configurations
   uint256 public mintRange;
@@ -34,13 +34,13 @@ contract FLAT is ERC20("FLAT", "FLAT"), Ownable {
   uint256 public lastMintAmount;
 
   /// @notice Contructor to initialize the contract
-  /// @param _initCoolDown The cool down period between mints
+  /// @param _initMintRange The cool down period between mints
   /// @param _initMaxMintBps The % of FLAT that can be minted
-  constructor(uint256 _initCoolDown, uint256 _initMaxMintBps) {
-    require(_initCoolDown >= 6 hours, "bad _newCoolDown");
-    require(_initMaxMintBps <= 3000, "bad _newMaxMintBps");
+  constructor(uint256 _initMintRange, uint256 _initMaxMintBps) {
+    require(_initMintRange >= 6 hours, "bad _initMintRange");
+    require(_initMaxMintBps <= 3000, "bad _initMaxMintBps");
 
-    mintRange = _initCoolDown;
+    mintRange = _initMintRange;
     maxMintBps = _initMaxMintBps;
   }
 
@@ -58,7 +58,7 @@ contract FLAT is ERC20("FLAT", "FLAT"), Ownable {
     require(_to != address(0), "bad _to");
 
     // Find out total amount that is minted in the given period.
-    // If lastMintTime >= now - mintRange, then the mint limit should lift.
+    // If lastMintTime < now - mintRange, then the mint limit should lift.
     uint256 _totalMintInPeriod = lastMintTime < block.timestamp - mintRange ? 0 : lastMintAmount + _amount;
     require(
       totalSupply() == 0 || (totalSupply() * maxMintBps) / BPS_PRECISION >= _totalMintInPeriod,
