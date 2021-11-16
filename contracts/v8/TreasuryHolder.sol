@@ -98,7 +98,7 @@ contract TreasuryHolder is OwnableUpgradeable {
 
     uint256 _balanceOf = clerk.balanceOf(flat, address(this));
 
-    clerk.transfer(flat, address(this), treasuryEOA, _balanceOf);
+    clerk.withdraw(flat, address(this), treasuryEOA, 0, _balanceOf);
 
     emit LogWithdrawSurplus(treasuryEOA, _balanceOf);
   }

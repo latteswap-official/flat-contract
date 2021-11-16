@@ -195,6 +195,8 @@ describe("TreasuryHolder", () => {
       await expect(treasuryHolder.withdrawSurplus())
         .to.emit(treasuryHolder, "LogWithdrawSurplus")
         .withArgs(alice.address, parseEther("1000"));
+
+      expect(await flat.balanceOf(alice.address)).to.eq(parseEther("1000"));
     });
   });
 
