@@ -21,6 +21,8 @@ import "./interfaces/IFlashLiquidateStrategy.sol";
 import "./interfaces/IClerk.sol";
 import "./interfaces/IFlatMarketConfig.sol";
 
+import "./interfaces/ITreasuryHolder.sol";
+
 import "./FLAT.sol";
 
 /// @title FlatMarket - A place where fellow baristas come and get their FLAT.
@@ -454,6 +456,8 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         if (userCollateralShare[_user] == 0 && userDebtShare[_user] != 0) {
           userDebtShare[marketConfig.treasury()] = userDebtShare[_user];
           userDebtShare[_user] = 0;
+          // call an `onBadDebt` call back so that the treasury would know if this market has a bad debt
+          ITreasuryHolderCallback(marketConfig.treasury()).onBadDebt();
         }
 
         // 4.1.6. Update total vairables

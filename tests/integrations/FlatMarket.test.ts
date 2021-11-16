@@ -17,6 +17,8 @@ import {
   OffChainOracle__factory,
   SimpleToken,
   SimpleToken__factory,
+  TreasuryHolder,
+  TreasuryHolder__factory,
 } from "../../typechain/v8";
 import {
   LatteSwapFactory,
@@ -57,6 +59,7 @@ describe("FlatMarket", () => {
   // latteSwap
   let latteSwapFactory: LatteSwapFactory;
   let latteSwapRouter: LatteSwapRouter;
+  let treasuryHolder: TreasuryHolder;
 
   // tokens
   let wbnb: MockWBNB;
@@ -210,6 +213,15 @@ describe("FlatMarket", () => {
       compositOracle.address,
       ethers.utils.defaultAbiCoder.encode(["address"], [usdcUsdtLp.address]),
     ])) as FlatMarket;
+
+    // Deploy TreasuryHolder
+    const TreasuryHolder = new TreasuryHolder__factory(deployer);
+    treasuryHolder = (await upgrades.deployProxy(TreasuryHolder, [
+      aliceAddress,
+      clerk.address,
+      flat.address,
+    ])) as TreasuryHolder;
+    await treasuryHolder.deployed();
 
     // Whitelist market to allow market to access funds in Clerk
     await clerk.whitelistMarket(usdcUsdtLpMarket.address, true);
@@ -1563,6 +1575,12 @@ describe("FlatMarket", () => {
       totalDebtShare = ethers.BigNumber.from(0);
       totalDebtValue = ethers.BigNumber.from(0);
 
+      // set Treasury to be a Treasury Holder
+      await flatMarketConfig.setTreasury(treasuryHolder.address);
+      expect(await flatMarketConfig.treasury(), "expect flat market config's treasury to be a treasury holder").to.eq(
+        treasuryHolder.address
+      );
+
       // Alice borrow FLAT using 50% of her collateral
       const aliceFlatBefore = await flat.balanceOf(aliceAddress);
       await usdcUsdtLpMarketAsAlice.depositAndBorrow(
@@ -1729,8 +1747,8 @@ describe("FlatMarket", () => {
             expect(catFlatBefore.sub(catFlatAfter)).to.be.eq(bobDebtValue.add(liquidationFee));
 
             // Treasury withdraw surplus, expect to get both accruedInterest and liquidation fee
-            const treasuryFlatBefore = await clerk.balanceOf(flat.address, deployerAddress);
-            await usdcUsdtLpMarket.withdrawSurplus();
+            const treasuryFlatBefore = await clerk.balanceOf(flat.address, treasuryHolder.address);
+            await treasuryHolder.collectSurplus([usdcUsdtLpMarket.address]);
             stages["withdrawSurplus"] = await timeHelpers.latestTimestamp();
             // Calculate totalDebtValue at accrue
             interest = calculateAccruedInterest(
@@ -1741,11 +1759,20 @@ describe("FlatMarket", () => {
             );
             accruedInterest = accruedInterest.add(interest);
             totalDebtValue = totalDebtValue.add(interest);
-            const treasuryFlatAfter = await clerk.balanceOf(flat.address, deployerAddress);
+            const treasuryFlatAfter = await clerk.balanceOf(flat.address, treasuryHolder.address);
             expect(await usdcUsdtLpMarket.surplus()).to.be.eq(0);
             expect(await usdcUsdtLpMarket.liquidationFee()).to.be.eq(0);
             expect(await usdcUsdtLpMarket.totalDebtValue()).to.be.eq(totalDebtValue);
             expect(treasuryFlatAfter.sub(treasuryFlatBefore)).to.be.eq(accruedInterest.add(liquidationFee));
+
+            expect(
+              await treasuryHolder.badDebtMarketCount(),
+              "if no bad debt, should not update the market count"
+            ).to.be.eq(0);
+            expect(
+              await treasuryHolder.badDebtMarkets(usdcUsdtLpMarket.address),
+              "if no bad dent, should not update bad debt markets"
+            ).to.be.false;
           });
         });
 
@@ -1809,8 +1836,8 @@ describe("FlatMarket", () => {
             expect(catFlatBefore.sub(catFlatAfter)).to.be.eq(bobDebtValue.add(liquidationFee));
 
             // Treasury withdraw surplus, expect to get both accruedInterest and liquidation fee
-            const treasuryFlatBefore = await clerk.balanceOf(flat.address, deployerAddress);
-            await usdcUsdtLpMarket.withdrawSurplus();
+            const treasuryFlatBefore = await clerk.balanceOf(flat.address, treasuryHolder.address);
+            await treasuryHolder.collectSurplus([usdcUsdtLpMarket.address]);
             stages["withdrawSurplus"] = await timeHelpers.latestTimestamp();
             // Calculate totalDebtValue at accrue
             interest = calculateAccruedInterest(
@@ -1821,11 +1848,20 @@ describe("FlatMarket", () => {
             );
             accruedInterest = accruedInterest.add(interest);
             totalDebtValue = totalDebtValue.add(interest);
-            const treasuryFlatAfter = await clerk.balanceOf(flat.address, deployerAddress);
+            const treasuryFlatAfter = await clerk.balanceOf(flat.address, treasuryHolder.address);
             expect(await usdcUsdtLpMarket.surplus()).to.be.eq(0);
             expect(await usdcUsdtLpMarket.liquidationFee()).to.be.eq(0);
             expect(await usdcUsdtLpMarket.totalDebtValue()).to.be.eq(totalDebtValue);
             expect(treasuryFlatAfter.sub(treasuryFlatBefore)).to.be.eq(accruedInterest.add(liquidationFee));
+
+            expect(
+              await treasuryHolder.badDebtMarketCount(),
+              "if no bad debt, should not update the market count"
+            ).to.be.eq(0);
+            expect(
+              await treasuryHolder.badDebtMarkets(usdcUsdtLpMarket.address),
+              "if no bad dent, should not update bad debt markets"
+            ).to.be.false;
           });
         });
       });
@@ -1860,7 +1896,9 @@ describe("FlatMarket", () => {
           accruedInterest = accruedInterest.add(interest);
           totalDebtValue = totalDebtValue.add(interest);
 
-          expect(catFlatAfter.sub(catFlatBefore)).to.be.eq(ethers.utils.parseEther("10000000"));
+          expect(catFlatAfter.sub(catFlatBefore), "FLAT owned by cat should be 10000000").to.be.eq(
+            ethers.utils.parseEther("10000000")
+          );
           expect(await usdcUsdtLpMarket.totalDebtShare()).to.be.eq(totalDebtShare);
           expect(await usdcUsdtLpMarket.totalDebtValue()).to.be.eq(totalDebtValue);
         });
@@ -1921,13 +1959,13 @@ describe("FlatMarket", () => {
             expect(bobCollateralAfter).to.be.eq(0);
             expect(await usdcUsdtLpMarket.surplus()).to.be.eq(accruedInterest);
             expect(await usdcUsdtLpMarket.liquidationFee()).to.be.eq(liquidationFee);
-            expect(await usdcUsdtLpMarket.userDebtShare(deployerAddress)).to.be.eq(
+            expect(await usdcUsdtLpMarket.userDebtShare(treasuryHolder.address)).to.be.eq(
               bobDebtShareBefore.sub(bobTakenDebtShare)
             );
 
-            // Treasury withdraw surplus, expect to get both accruedInterest and liquidation fee
-            const treasuryFlatBefore = await clerk.balanceOf(flat.address, deployerAddress);
-            await usdcUsdtLpMarket.withdrawSurplus();
+            // TreasuryHolder collect surplus, expect to get both accruedInterest and liquidation fee
+            const treasuryFlatBefore = await clerk.balanceOf(flat.address, treasuryHolder.address);
+            await treasuryHolder.collectSurplus([usdcUsdtLpMarket.address]);
             stages["withdrawSurplus"] = await timeHelpers.latestTimestamp();
             // Calculate totalDebtValue at accrue
             interest = calculateAccruedInterest(
@@ -1938,11 +1976,42 @@ describe("FlatMarket", () => {
             );
             accruedInterest = accruedInterest.add(interest);
             totalDebtValue = totalDebtValue.add(interest);
-            const treasuryFlatAfter = await clerk.balanceOf(flat.address, deployerAddress);
+            const treasuryFlatAfter = await clerk.balanceOf(flat.address, treasuryHolder.address);
             expect(await usdcUsdtLpMarket.surplus()).to.be.eq(0);
             expect(await usdcUsdtLpMarket.liquidationFee()).to.be.eq(0);
             expect(await usdcUsdtLpMarket.totalDebtValue()).to.be.eq(totalDebtValue);
             expect(treasuryFlatAfter.sub(treasuryFlatBefore)).to.be.eq(accruedInterest.add(liquidationFee));
+
+            expect(await treasuryHolder.badDebtMarketCount()).to.be.eq(1);
+            expect(await treasuryHolder.badDebtMarkets(usdcUsdtLpMarket.address)).to.be.true;
+            await expect(treasuryHolder.withdrawSurplus()).to.be.revertedWith(
+              "TreasuryHolder::withdrawSurplus:: there are still bad debt markets"
+            );
+            // deployer deposit some flat to treasury holder so that it can settle bad debt
+            const extraDeposit = ethers.utils.parseEther("168");
+            await flat.approve(clerk.address, ethers.constants.MaxUint256);
+            await clerk.deposit(
+              flat.address,
+              deployerAddress,
+              treasuryHolder.address,
+              (await usdcUsdtLpMarket.userDebtShare(treasuryHolder.address)).sub(treasuryFlatAfter).add(extraDeposit),
+              0
+            );
+            // treasury holder operations
+            await expect(treasuryHolder.settleBadDebt([usdcUsdtLpMarket.address]))
+              .to.emit(treasuryHolder, "LogBadDebt")
+              .withArgs(usdcUsdtLpMarket.address, false, 0);
+            expect(await treasuryHolder.badDebtMarketCount(), "bad debt should be 0").to.be.eq(0);
+            expect(
+              await treasuryHolder.badDebtMarkets(usdcUsdtLpMarket.address),
+              "bad debt market for usdcUsdt should be false"
+            ).to.be.false;
+            const aliceFlatBefore = await flat.balanceOf(aliceAddress);
+            await treasuryHolder.withdrawSurplus();
+            expect(
+              (await flat.balanceOf(aliceAddress)).sub(aliceFlatBefore),
+              "168 FLAT should be sent back to the eoa account"
+            ).to.eq(extraDeposit);
           });
         });
 
@@ -2009,13 +2078,13 @@ describe("FlatMarket", () => {
             expect(bobCollateralAfter).to.be.eq(0);
             expect(await usdcUsdtLpMarket.surplus()).to.be.eq(accruedInterest);
             expect(await usdcUsdtLpMarket.liquidationFee()).to.be.eq(liquidationFee);
-            expect(await usdcUsdtLpMarket.userDebtShare(deployerAddress)).to.be.eq(
+            expect(await usdcUsdtLpMarket.userDebtShare(treasuryHolder.address)).to.be.eq(
               bobDebtShareBefore.sub(bobActualTakenDebtShare)
             );
 
             // Treasury withdraw surplus, expect to get both accruedInterest and liquidation fee
-            const treasuryFlatBefore = await clerk.balanceOf(flat.address, deployerAddress);
-            await usdcUsdtLpMarket.withdrawSurplus();
+            const treasuryFlatBefore = await clerk.balanceOf(flat.address, treasuryHolder.address);
+            await treasuryHolder.collectSurplus([usdcUsdtLpMarket.address]);
             stages["withdrawSurplus"] = await timeHelpers.latestTimestamp();
             // Calculate totalDebtValue at accrue
             interest = calculateAccruedInterest(
@@ -2026,11 +2095,41 @@ describe("FlatMarket", () => {
             );
             accruedInterest = accruedInterest.add(interest);
             totalDebtValue = totalDebtValue.add(interest);
-            const treasuryFlatAfter = await clerk.balanceOf(flat.address, deployerAddress);
+            const treasuryFlatAfter = await clerk.balanceOf(flat.address, treasuryHolder.address);
             expect(await usdcUsdtLpMarket.surplus()).to.be.eq(0);
             expect(await usdcUsdtLpMarket.liquidationFee()).to.be.eq(0);
             expect(await usdcUsdtLpMarket.totalDebtValue()).to.be.eq(totalDebtValue);
             expect(treasuryFlatAfter.sub(treasuryFlatBefore)).to.be.eq(accruedInterest.add(liquidationFee));
+            expect(await treasuryHolder.badDebtMarketCount()).to.be.eq(1);
+            expect(await treasuryHolder.badDebtMarkets(usdcUsdtLpMarket.address)).to.be.true;
+            await expect(treasuryHolder.withdrawSurplus()).to.be.revertedWith(
+              "TreasuryHolder::withdrawSurplus:: there are still bad debt markets"
+            );
+            // deployer deposit some flat to treasury holder so that it can settle bad debt
+            const extraDeposit = ethers.utils.parseEther("168");
+            await flat.approve(clerk.address, ethers.constants.MaxUint256);
+            await clerk.deposit(
+              flat.address,
+              deployerAddress,
+              treasuryHolder.address,
+              (await usdcUsdtLpMarket.userDebtShare(treasuryHolder.address)).sub(treasuryFlatAfter).add(extraDeposit),
+              0
+            );
+            // treasury holder operations
+            await expect(treasuryHolder.settleBadDebt([usdcUsdtLpMarket.address]))
+              .to.emit(treasuryHolder, "LogBadDebt")
+              .withArgs(usdcUsdtLpMarket.address, false, 0);
+            expect(await treasuryHolder.badDebtMarketCount(), "bad debt should be 0").to.be.eq(0);
+            expect(
+              await treasuryHolder.badDebtMarkets(usdcUsdtLpMarket.address),
+              "bad debt market for usdcUsdt should be false"
+            ).to.be.false;
+            const aliceFlatBefore = await flat.balanceOf(aliceAddress);
+            await treasuryHolder.withdrawSurplus();
+            expect(
+              (await flat.balanceOf(aliceAddress)).sub(aliceFlatBefore),
+              "168 FLAT should be sent back to the eoa account"
+            ).to.eq(extraDeposit);
           });
         });
       });
