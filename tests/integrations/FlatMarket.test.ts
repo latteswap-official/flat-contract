@@ -1766,13 +1766,13 @@ describe("FlatMarket", () => {
             expect(treasuryFlatAfter.sub(treasuryFlatBefore)).to.be.eq(accruedInterest.add(liquidationFee));
 
             expect(
-              await treasuryHolder.badDebtMarketCount(),
+              await treasuryHolder.totalBadDebtValue(),
               "if no bad debt, should not update the market count"
             ).to.be.eq(0);
             expect(
               await treasuryHolder.badDebtMarkets(usdcUsdtLpMarket.address),
               "if no bad dent, should not update bad debt markets"
-            ).to.be.false;
+            ).to.be.eq(0);
           });
         });
 
@@ -1855,13 +1855,13 @@ describe("FlatMarket", () => {
             expect(treasuryFlatAfter.sub(treasuryFlatBefore)).to.be.eq(accruedInterest.add(liquidationFee));
 
             expect(
-              await treasuryHolder.badDebtMarketCount(),
+              await treasuryHolder.totalBadDebtValue(),
               "if no bad debt, should not update the market count"
             ).to.be.eq(0);
             expect(
               await treasuryHolder.badDebtMarkets(usdcUsdtLpMarket.address),
               "if no bad dent, should not update bad debt markets"
-            ).to.be.false;
+            ).to.be.eq(0);
           });
         });
       });
@@ -1928,6 +1928,12 @@ describe("FlatMarket", () => {
             );
             accruedInterest = accruedInterest.add(interest);
             totalDebtValue = totalDebtValue.add(interest);
+            const bobDebtValBefore = debtHelpers.debtShareToValue(
+              bobDebtShareBefore,
+              totalDebtShare,
+              totalDebtValue,
+              false
+            );
             // Calculate expected debtShare to be taken from Bob
             const bobTakenDebtValue = bobCollateralAmount
               .mul(collateralPrice)
@@ -1946,21 +1952,22 @@ describe("FlatMarket", () => {
               .mul(LIQUIDATION_TREASURY_BPS)
               .div(1e4);
             // Calculate totalDebtShare when debt is removed from Bob
-            totalDebtShare = totalDebtShare.sub(bobTakenDebtShare);
+            totalDebtShare = totalDebtShare.sub(bobDebtShareBefore);
             // Calculate totalDebtValue after Bob's position is killed
-            totalDebtValue = totalDebtValue.sub(bobTakenDebtValue);
+            totalDebtValue = totalDebtValue.sub(bobDebtValBefore);
             // Expect that totalDebtValue and totalDebtShare must correct
             expect(await usdcUsdtLpMarket.totalDebtShare()).to.be.eq(totalDebtShare);
             expect(await usdcUsdtLpMarket.totalDebtValue()).to.be.eq(totalDebtValue);
-
             expect(aliceDebtShareAfter).to.be.eq(aliceDebtShareBefore);
             expect(aliceCollateralBefore).to.be.eq(aliceCollateralAfter);
             expect(bobDebtShareAfter).to.be.eq(0);
             expect(bobCollateralAfter).to.be.eq(0);
             expect(await usdcUsdtLpMarket.surplus()).to.be.eq(accruedInterest);
             expect(await usdcUsdtLpMarket.liquidationFee()).to.be.eq(liquidationFee);
-            expect(await usdcUsdtLpMarket.userDebtShare(treasuryHolder.address)).to.be.eq(
-              bobDebtShareBefore.sub(bobTakenDebtShare)
+            expect(await usdcUsdtLpMarket.userDebtShare(treasuryHolder.address)).to.be.eq(0);
+            const userDebtValue = await usdcUsdtLpMarket.debtShareToValue(
+              bobDebtShareBefore.sub(bobTakenDebtShare),
+              false
             );
 
             // TreasuryHolder collect surplus, expect to get both accruedInterest and liquidation fee
@@ -1982,8 +1989,8 @@ describe("FlatMarket", () => {
             expect(await usdcUsdtLpMarket.totalDebtValue()).to.be.eq(totalDebtValue);
             expect(treasuryFlatAfter.sub(treasuryFlatBefore)).to.be.eq(accruedInterest.add(liquidationFee));
 
-            expect(await treasuryHolder.badDebtMarketCount()).to.be.eq(1);
-            expect(await treasuryHolder.badDebtMarkets(usdcUsdtLpMarket.address)).to.be.true;
+            expect(await treasuryHolder.totalBadDebtValue()).to.be.eq(userDebtValue);
+            expect(await treasuryHolder.badDebtMarkets(usdcUsdtLpMarket.address)).to.be.eq(userDebtValue);
             await expect(treasuryHolder.withdrawSurplus()).to.be.revertedWith(
               "TreasuryHolder::withdrawSurplus:: there are still bad debt markets"
             );
@@ -1994,18 +2001,18 @@ describe("FlatMarket", () => {
               flat.address,
               deployerAddress,
               treasuryHolder.address,
-              (await usdcUsdtLpMarket.userDebtShare(treasuryHolder.address)).sub(treasuryFlatAfter).add(extraDeposit),
+              userDebtValue.sub(treasuryFlatAfter).add(extraDeposit),
               0
             );
             // treasury holder operations
             await expect(treasuryHolder.settleBadDebt([usdcUsdtLpMarket.address]))
               .to.emit(treasuryHolder, "LogBadDebt")
-              .withArgs(usdcUsdtLpMarket.address, false, 0);
-            expect(await treasuryHolder.badDebtMarketCount(), "bad debt should be 0").to.be.eq(0);
+              .withArgs(usdcUsdtLpMarket.address, userDebtValue);
+            expect(await treasuryHolder.totalBadDebtValue(), "bad debt should be 0").to.be.eq(0);
             expect(
               await treasuryHolder.badDebtMarkets(usdcUsdtLpMarket.address),
               "bad debt market for usdcUsdt should be false"
-            ).to.be.false;
+            ).to.be.eq(0);
             const aliceFlatBefore = await flat.balanceOf(aliceAddress);
             await treasuryHolder.withdrawSurplus();
             expect(
@@ -2051,6 +2058,12 @@ describe("FlatMarket", () => {
             );
             accruedInterest = accruedInterest.add(interest);
             totalDebtValue = totalDebtValue.add(interest);
+            const bobDebtValBefore = debtHelpers.debtShareToValue(
+              bobDebtShareBefore,
+              totalDebtShare,
+              totalDebtValue,
+              false
+            );
             // Calculate expected debtShare to be taken from Bob
             const bobActualTakenDebtShare = debtHelpers.debtValueToShare(
               bobTakenDebtValue,
@@ -2065,9 +2078,9 @@ describe("FlatMarket", () => {
               .mul(LIQUIDATION_TREASURY_BPS)
               .div(1e4);
             // Calculate totalDebtShare when debt is removed from Bob
-            totalDebtShare = totalDebtShare.sub(bobActualTakenDebtShare);
+            totalDebtShare = totalDebtShare.sub(bobDebtShareBefore);
             // Calculate totalDebtValue after Bob's position is killed
-            totalDebtValue = totalDebtValue.sub(bobTakenDebtValue);
+            totalDebtValue = totalDebtValue.sub(bobDebtValBefore);
             // Expect that totalDebtValue and totalDebtShare must correct
             expect(await usdcUsdtLpMarket.totalDebtShare()).to.be.eq(totalDebtShare);
             expect(await usdcUsdtLpMarket.totalDebtValue()).to.be.eq(totalDebtValue);
@@ -2078,10 +2091,12 @@ describe("FlatMarket", () => {
             expect(bobCollateralAfter).to.be.eq(0);
             expect(await usdcUsdtLpMarket.surplus()).to.be.eq(accruedInterest);
             expect(await usdcUsdtLpMarket.liquidationFee()).to.be.eq(liquidationFee);
-            expect(await usdcUsdtLpMarket.userDebtShare(treasuryHolder.address)).to.be.eq(
-              bobDebtShareBefore.sub(bobActualTakenDebtShare)
-            );
+            expect(await usdcUsdtLpMarket.userDebtShare(treasuryHolder.address)).to.be.eq(0);
 
+            const userDebtValue = await usdcUsdtLpMarket.debtShareToValue(
+              bobDebtShareBefore.sub(bobActualTakenDebtShare),
+              false
+            );
             // Treasury withdraw surplus, expect to get both accruedInterest and liquidation fee
             const treasuryFlatBefore = await clerk.balanceOf(flat.address, treasuryHolder.address);
             await treasuryHolder.collectSurplus([usdcUsdtLpMarket.address]);
@@ -2096,12 +2111,14 @@ describe("FlatMarket", () => {
             accruedInterest = accruedInterest.add(interest);
             totalDebtValue = totalDebtValue.add(interest);
             const treasuryFlatAfter = await clerk.balanceOf(flat.address, treasuryHolder.address);
+
             expect(await usdcUsdtLpMarket.surplus()).to.be.eq(0);
             expect(await usdcUsdtLpMarket.liquidationFee()).to.be.eq(0);
             expect(await usdcUsdtLpMarket.totalDebtValue()).to.be.eq(totalDebtValue);
             expect(treasuryFlatAfter.sub(treasuryFlatBefore)).to.be.eq(accruedInterest.add(liquidationFee));
-            expect(await treasuryHolder.badDebtMarketCount()).to.be.eq(1);
-            expect(await treasuryHolder.badDebtMarkets(usdcUsdtLpMarket.address)).to.be.true;
+            expect(await treasuryHolder.totalBadDebtValue()).to.be.eq(userDebtValue);
+            expect(await treasuryHolder.badDebtMarkets(usdcUsdtLpMarket.address)).to.be.eq(userDebtValue);
+
             await expect(treasuryHolder.withdrawSurplus()).to.be.revertedWith(
               "TreasuryHolder::withdrawSurplus:: there are still bad debt markets"
             );
@@ -2112,18 +2129,18 @@ describe("FlatMarket", () => {
               flat.address,
               deployerAddress,
               treasuryHolder.address,
-              (await usdcUsdtLpMarket.userDebtShare(treasuryHolder.address)).sub(treasuryFlatAfter).add(extraDeposit),
+              userDebtValue.sub(treasuryFlatAfter).add(extraDeposit),
               0
             );
             // treasury holder operations
             await expect(treasuryHolder.settleBadDebt([usdcUsdtLpMarket.address]))
               .to.emit(treasuryHolder, "LogBadDebt")
-              .withArgs(usdcUsdtLpMarket.address, false, 0);
-            expect(await treasuryHolder.badDebtMarketCount(), "bad debt should be 0").to.be.eq(0);
+              .withArgs(usdcUsdtLpMarket.address, userDebtValue);
+            expect(await treasuryHolder.totalBadDebtValue(), "bad debt should be 0").to.be.eq(0);
             expect(
               await treasuryHolder.badDebtMarkets(usdcUsdtLpMarket.address),
               "bad debt market for usdcUsdt should be false"
-            ).to.be.false;
+            ).to.be.eq(0);
             const aliceFlatBefore = await flat.balanceOf(aliceAddress);
             await treasuryHolder.withdrawSurplus();
             expect(
