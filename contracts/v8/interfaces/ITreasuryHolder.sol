@@ -16,5 +16,5 @@ import "./IFlatMarket.sol";
 
 /// @title ITreasuryHolderCallback is an interface for flat market to be used
 interface ITreasuryHolderCallback {
-  function onBadDebt() external;
+  function onBadDebt(uint256 _badDebtValue) external;
 }

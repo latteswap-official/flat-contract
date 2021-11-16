@@ -454,10 +454,12 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         // Then it is bad debt. Hence move user's debt share to treasury.
         // Treausry will settle bad debt later by surplus or liquidation fee
         if (userCollateralShare[_user] == 0 && userDebtShare[_user] != 0) {
-          userDebtShare[marketConfig.treasury()] = userDebtShare[_user];
+          uint256 _badDebtValue = debtShareToValue(userDebtShare[_user], false);
+          totalDebtShare = totalDebtShare - userDebtShare[_user];
+          totalDebtValue = totalDebtValue - _badDebtValue;
           userDebtShare[_user] = 0;
           // call an `onBadDebt` call back so that the treasury would know if this market has a bad debt
-          ITreasuryHolderCallback(marketConfig.treasury()).onBadDebt();
+          ITreasuryHolderCallback(marketConfig.treasury()).onBadDebt(_badDebtValue);
         }
 
         // 4.1.6. Update total vairables

@@ -13,21 +13,22 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 import "./interfaces/IClerk.sol";
 import "./interfaces/IFlatMarket.sol";
+import "./interfaces/ITreasuryHolder.sol";
 
 /// @title TreasuryHolder is a contract that holds all revenue from markets, as well as manage a bad debt (if exists)
-contract TreasuryHolder is OwnableUpgradeable {
+contract TreasuryHolder is OwnableUpgradeable, ITreasuryHolderCallback {
   // contracts binding
   address public treasuryEOA;
   IClerk public clerk;
   IERC20Upgradeable public flat;
 
   // contract states
-  uint256 public badDebtMarketCount;
   uint256 public priceDeviation;
 
-  mapping(address => bool) public badDebtMarkets;
+  mapping(address => uint256) public badDebtMarkets;
+  uint256 public totalBadDebtValue;
 
-  event LogBadDebt(address indexed market, bool isHavingBadDebt, uint256 marketCount);
+  event LogBadDebt(address indexed market, uint256 marketBadDebtValue);
   event LogSettleBadDebt(address indexed market, uint256 settleAmount);
   event LogWithdrawSurplus(address indexed to, uint256 share);
   event LogSetTreasuryEOA(address indexed treasuryEOA);
@@ -57,29 +58,27 @@ contract TreasuryHolder is OwnableUpgradeable {
     _;
   }
 
-  function onBadDebt() external isWhitelisted {
-    if (!badDebtMarkets[_msgSender()]) {
-      badDebtMarkets[_msgSender()] = true;
-      badDebtMarketCount++;
+  function onBadDebt(uint256 _badDebtValue) external isWhitelisted {
+    badDebtMarkets[_msgSender()] = badDebtMarkets[_msgSender()] + _badDebtValue;
+    totalBadDebtValue = totalBadDebtValue + _badDebtValue;
 
-      emit LogBadDebt(_msgSender(), true, badDebtMarketCount);
-    }
+    emit LogBadDebt(_msgSender(), badDebtMarkets[_msgSender()]);
   }
 
   /// @notice function to settle bad debts for each market if bad debt exists
   /// @param _markets array of markets
   function settleBadDebt(address[] calldata _markets) external onlyOwner {
     for (uint256 i = 0; i < _markets.length; i++) {
-      require(badDebtMarkets[_markets[i]], "TreasuryHolder::settleBadDebt:: market is not in bad debt");
+      require(badDebtMarkets[_markets[i]] > 0, "TreasuryHolder::settleBadDebt:: market is not in bad debt");
 
-      badDebtMarkets[_markets[i]] = false;
-      badDebtMarketCount--;
+      uint256 _badDebt = badDebtMarkets[_markets[i]];
+      totalBadDebtValue = totalBadDebtValue - _badDebt;
+      badDebtMarkets[_markets[i]] = 0;
 
-      IFlatMarket _flatMarket = IFlatMarket(_markets[i]);
+      uint256 _settleBadDebtShare = clerk.toShare(flat, _badDebt, false);
+      clerk.transfer(flat, address(this), _markets[i], _settleBadDebtShare);
 
-      _flatMarket.repay(address(this), _flatMarket.userDebtShare(address(this)));
-
-      emit LogBadDebt(_markets[i], false, badDebtMarketCount);
+      emit LogBadDebt(_markets[i], _badDebt);
     }
   }
 
@@ -93,7 +92,7 @@ contract TreasuryHolder is OwnableUpgradeable {
 
   /// @notice function to withdraw a surplus + liquidation share to the EOA address
   function withdrawSurplus() external onlyOwner {
-    require(badDebtMarketCount == 0, "TreasuryHolder::withdrawSurplus:: there are still bad debt markets");
+    require(totalBadDebtValue == 0, "TreasuryHolder::withdrawSurplus:: there are still bad debt markets");
     require(treasuryEOA != address(0), "TreasuryHolder::withdrawSurplus:: treasuryEOA is address(0)");
 
     uint256 _balanceOf = clerk.balanceOf(flat, address(this));
