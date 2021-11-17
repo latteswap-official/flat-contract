@@ -7,14 +7,14 @@ import {
   SimpleToken__factory,
   LatteSwapLiquidationStrategy__factory,
   LatteSwapLiquidationStrategy,
-} from "../../../typechain/v8";
-import {
+  LatteSwapPair__factory,
+  LatteSwapPair,
   MockWBNB__factory,
   LatteSwapFactory,
   LatteSwapRouter,
   LatteSwapFactory__factory,
   LatteSwapRouter__factory,
-} from "@latteswap/latteswap-contract/compiled-typechain";
+} from "../../../typechain/v8";
 import { BigNumber, constants, Wallet } from "ethers";
 import { MockProvider } from "ethereum-waffle";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
@@ -26,9 +26,12 @@ export interface ILatteSwapLiquidationStrategyDTO {
   factory: LatteSwapFactory;
   token0: SimpleToken;
   token1: SimpleToken;
+  flat: SimpleToken;
+  lp: LatteSwapPair;
   deployer: SignerWithAddress;
   reserve0: BigNumber;
   reserve1: BigNumber;
+  reserveFlat: BigNumber;
 }
 
 export async function latteSwapLiquidationStrategyIntegrationTestFixture(
@@ -39,6 +42,7 @@ export async function latteSwapLiquidationStrategyIntegrationTestFixture(
   const [deployer] = await ethers.getSigners();
   const reserve0 = ethers.utils.parseEther("100000");
   const reserve1 = ethers.utils.parseEther("10000");
+  const reserveFlat = ethers.utils.parseEther("168168");
 
   const MockWBNB = new MockWBNB__factory(deployer);
   const wbnb = await MockWBNB.deploy();
@@ -58,7 +62,7 @@ export async function latteSwapLiquidationStrategyIntegrationTestFixture(
     stakingTokens.push(simpleToken);
   }
 
-  const [token0, token1] = [stakingTokens[0], stakingTokens[1]];
+  const [token0, token1, flat] = [stakingTokens[0], stakingTokens[1], stakingTokens[2]];
 
   const Factory = new LatteSwapFactory__factory(deployer);
   const factory = await Factory.deploy(deployer.address);
@@ -70,8 +74,10 @@ export async function latteSwapLiquidationStrategyIntegrationTestFixture(
 
   await token0.approve(router.address, constants.MaxUint256);
   await token1.approve(router.address, constants.MaxUint256);
+  await flat.approve(router.address, constants.MaxUint256);
 
   await router.deployed();
+  // add liquidity for token0-token1
   await router.addLiquidity(
     token0.address,
     token1.address,
@@ -82,6 +88,34 @@ export async function latteSwapLiquidationStrategyIntegrationTestFixture(
     await deployer.getAddress(),
     FOREVER
   );
+  // add liquidity for token0-flat
+  await router.addLiquidity(
+    token0.address,
+    flat.address,
+    reserve0,
+    reserveFlat,
+    "0",
+    "0",
+    await deployer.getAddress(),
+    FOREVER
+  );
+  // add liquidity for token1-flat
+  await router.addLiquidity(
+    token1.address,
+    flat.address,
+    reserve1,
+    reserveFlat,
+    "0",
+    "0",
+    await deployer.getAddress(),
+    FOREVER
+  );
+
+  // token0-token1 lp
+  const lp = LatteSwapPair__factory.connect(
+    await factory.getPair(token0.address, token1.address),
+    deployer
+  ) as LatteSwapPair;
 
   const LatteSwapLiquidationStrategy = (await ethers.getContractFactory(
     "LatteSwapLiquidationStrategy",
@@ -102,8 +136,11 @@ export async function latteSwapLiquidationStrategyIntegrationTestFixture(
     factory,
     token0,
     token1,
+    flat,
+    lp,
     deployer,
     reserve0,
     reserve1,
+    reserveFlat,
   };
 }
