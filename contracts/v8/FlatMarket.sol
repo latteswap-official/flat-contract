@@ -172,7 +172,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   /// @param _amount The amount of FLAT to be borrowed
   function _borrow(address _to, uint256 _amount) internal returns (uint256 _debtShare, uint256 _share) {
     // 1. Find out debtShare from the give "_value" that msg.sender wish to borrow
-    _debtShare = debtValueToShare(_amount, true);
+    _debtShare = debtValueToShare(_amount);
 
     // 2. Update user's debtShare
     userDebtShare[msg.sender] = userDebtShare[msg.sender] + _debtShare;
@@ -266,10 +266,13 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   /// @notice Return the debt share for the given debt value.
   /// @dev debt share will always be rounded up to prevent tiny share.
   /// @param _debtValue The debt value to be converted.
-  function debtValueToShare(uint256 _debtValue, bool _roundUp) public view returns (uint256) {
+  function debtValueToShare(uint256 _debtValue) public view returns (uint256) {
     if (totalDebtShare == 0) return _debtValue;
     uint256 _debtShare = (_debtValue * totalDebtShare) / totalDebtValue;
-    return _debtShare + 1;
+    if ((_debtShare * totalDebtValue) / totalDebtShare < _debtValue) {
+      return _debtShare + 1;
+    }
+    return _debtShare;
   }
 
   /// @notice Deposit collateral to Clerk.
@@ -432,7 +435,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
           _borrowAmount =
             (clerk.toAmount(collateral, _collateralShare, false) * _collateralPrice * BPS_PRECISION) /
             (COLLATERAL_PRICE_PRECISION * _liquidationPenalty);
-          _lessDebtShare = debtValueToShare(_borrowAmount, true);
+          _lessDebtShare = debtValueToShare(_borrowAmount);
         } else {
           userCollateralShare[_user] = userCollateralShare[_user] - _collateralShare;
         }
@@ -549,7 +552,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   /// @param _debtValue The debt value to be repaid.
   function _repay(address _for, uint256 _debtValue) internal returns (uint256 _debtShare) {
     // 1. Findout "_debtShare" from the given "_debtValue"
-    _debtShare = debtValueToShare(_debtValue, true);
+    _debtShare = debtValueToShare(_debtValue);
 
     // 2. Update user's debtShare
     userDebtShare[_for] = userDebtShare[_for] - _debtShare;

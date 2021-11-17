@@ -921,9 +921,9 @@ describe("FlatMarket", () => {
           expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(0);
           expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount);
           expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
-          expect(
-            await usdcUsdtLpMarket.debtShareToValue(await usdcUsdtLpMarket.userDebtShare(aliceAddress), true)
-          ).to.be.eq(totalDebtValue.sub(repayFunds));
+          expect(await usdcUsdtLpMarket.debtShareToValue(await usdcUsdtLpMarket.userDebtShare(aliceAddress))).to.be.eq(
+            totalDebtValue.sub(repayFunds)
+          );
         });
       });
     });
@@ -957,8 +957,7 @@ describe("FlatMarket", () => {
         const expectedBobDebtShare = debtHelpers.debtValueToShare(
           bobBorrowAmount,
           totalDebtShareBefore,
-          totalDebtValue,
-          true
+          totalDebtValue
         );
 
         const expectedTotalCollateral = collateralAmount.add(bobCollateralAmount);
@@ -999,18 +998,12 @@ describe("FlatMarket", () => {
           );
 
           // Calculate Alice's debtValue, Alice's debtShare is equal to her borrowAmount
-          const expectedDebtShareToDeduct = debtHelpers.debtValueToShare(
-            repayFunds,
-            totalDebtShare,
-            totalDebtValue,
-            false
-          );
+          const expectedDebtShareToDeduct = debtHelpers.debtValueToShare(repayFunds, totalDebtShare, totalDebtValue);
           const expectedAliceDebtShare = borrowAmount.sub(expectedDebtShareToDeduct);
           const expectedAliceDebtValue = debtHelpers.debtShareToValue(
             expectedAliceDebtShare,
             totalDebtShare.sub(expectedDebtShareToDeduct),
-            totalDebtValue.sub(repayFunds),
-            true
+            totalDebtValue.sub(repayFunds)
           );
 
           expect(usdcUsdtLpMarketFlatAfter.sub(usdcUsdtLpMarketFlatBefore)).to.be.eq(repayFunds);
@@ -1023,9 +1016,9 @@ describe("FlatMarket", () => {
           expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
           expect(await usdcUsdtLpMarket.userCollateralShare(bobAddress)).to.be.eq(bobCollateralAmount);
           expect(await usdcUsdtLpMarket.userDebtShare(aliceAddress)).to.be.eq(expectedAliceDebtShare);
-          expect(
-            await usdcUsdtLpMarket.debtShareToValue(await usdcUsdtLpMarket.userDebtShare(aliceAddress), true)
-          ).to.be.eq(expectedAliceDebtValue);
+          expect(await usdcUsdtLpMarket.debtShareToValue(await usdcUsdtLpMarket.userDebtShare(aliceAddress))).to.be.eq(
+            expectedAliceDebtValue
+          );
         });
       });
 
@@ -1046,12 +1039,7 @@ describe("FlatMarket", () => {
           );
 
           // Calculate Alice's debtValue, Alice's debtShare is equal to her borrowAmount
-          const expectedAliceDebtValue = debtHelpers.debtShareToValue(
-            borrowAmount,
-            totalDebtShare,
-            totalDebtValue,
-            true
-          );
+          const expectedAliceDebtValue = debtHelpers.debtShareToValue(borrowAmount, totalDebtShare, totalDebtValue);
 
           expect(usdcUsdtLpMarketFlatAfter.sub(usdcUsdtLpMarketFlatBefore)).to.be.eq(expectedAliceDebtValue);
           expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
@@ -1623,7 +1611,7 @@ describe("FlatMarket", () => {
       totalDebtValue = totalDebtValue.add(interest);
       // Calculate totalDebtShare when debt is added to Bob
       totalDebtShare = totalDebtShare.add(
-        debtHelpers.debtValueToShare(bobBorrowAmount, totalDebtShare, totalDebtValue, true)
+        debtHelpers.debtValueToShare(bobBorrowAmount, totalDebtShare, totalDebtValue)
       );
       // Add bob's borrow amount to totalDebtValue
       totalDebtValue = totalDebtValue.add(bobBorrowAmount);
@@ -1711,12 +1699,7 @@ describe("FlatMarket", () => {
             accruedInterest = accruedInterest.add(interest);
             totalDebtValue = totalDebtValue.add(interest);
             // Calculate Bob's debt value to be removed
-            const bobDebtValue = debtHelpers.debtShareToValue(
-              bobDebtShareBefore,
-              totalDebtShare,
-              totalDebtValue,
-              false
-            );
+            const bobDebtValue = debtHelpers.debtShareToValue(bobDebtShareBefore, totalDebtShare, totalDebtValue);
             // Calculate totalDebtShare when debt is removed from Bob
             totalDebtShare = totalDebtShare.sub(bobDebtShareBefore);
             // Calculate totalDebtValue after Bob's position is killed
@@ -1802,12 +1785,7 @@ describe("FlatMarket", () => {
             accruedInterest = accruedInterest.add(interest);
             totalDebtValue = totalDebtValue.add(interest);
             // Calculate Bob's debt value to be removed, it should take all Bob's collateral
-            const bobDebtValue = debtHelpers.debtShareToValue(
-              liquidateDebtShare,
-              totalDebtShare,
-              totalDebtValue,
-              false
-            );
+            const bobDebtValue = debtHelpers.debtShareToValue(liquidateDebtShare, totalDebtShare, totalDebtValue);
             // Calculate totalDebtShare when debt is removed from Bob
             totalDebtShare = totalDebtShare.sub(liquidateDebtShare);
             // Calculate totalDebtValue after Bob's position is killed
@@ -1928,23 +1906,13 @@ describe("FlatMarket", () => {
             );
             accruedInterest = accruedInterest.add(interest);
             totalDebtValue = totalDebtValue.add(interest);
-            const bobDebtValBefore = debtHelpers.debtShareToValue(
-              bobDebtShareBefore,
-              totalDebtShare,
-              totalDebtValue,
-              false
-            );
+            const bobDebtValBefore = debtHelpers.debtShareToValue(bobDebtShareBefore, totalDebtShare, totalDebtValue);
             // Calculate expected debtShare to be taken from Bob
             const bobTakenDebtValue = bobCollateralAmount
               .mul(collateralPrice)
               .mul(1e4)
               .div(ethers.constants.WeiPerEther.mul(LIQUIDATION_PENALTY));
-            const bobTakenDebtShare = debtHelpers.debtValueToShare(
-              bobTakenDebtValue,
-              totalDebtShare,
-              totalDebtValue,
-              true
-            );
+            const bobTakenDebtShare = debtHelpers.debtValueToShare(bobTakenDebtValue, totalDebtShare, totalDebtValue);
             const liquidationFee = bobTakenDebtValue
               .mul(LIQUIDATION_PENALTY)
               .div(1e4)
@@ -1965,10 +1933,7 @@ describe("FlatMarket", () => {
             expect(await usdcUsdtLpMarket.surplus()).to.be.eq(accruedInterest);
             expect(await usdcUsdtLpMarket.liquidationFee()).to.be.eq(liquidationFee);
             expect(await usdcUsdtLpMarket.userDebtShare(treasuryHolder.address)).to.be.eq(0);
-            const userDebtValue = await usdcUsdtLpMarket.debtShareToValue(
-              bobDebtShareBefore.sub(bobTakenDebtShare),
-              false
-            );
+            const userDebtValue = await usdcUsdtLpMarket.debtShareToValue(bobDebtShareBefore.sub(bobTakenDebtShare));
 
             // TreasuryHolder collect surplus, expect to get both accruedInterest and liquidation fee
             const treasuryFlatBefore = await clerk.balanceOf(flat.address, treasuryHolder.address);
@@ -2032,7 +1997,7 @@ describe("FlatMarket", () => {
             // Calculate bobTakenDebtShare by a given bobTokenDebtValue
             // Need to minus dust to make dust happened
             const bobTakenDebtShare = debtHelpers
-              .debtValueToShare(bobTakenDebtValue, totalDebtShare, totalDebtValue, true)
+              .debtValueToShare(bobTakenDebtValue, totalDebtShare, totalDebtValue)
               .sub(ethers.utils.parseEther("0.1"));
 
             const aliceDebtShareBefore = await usdcUsdtLpMarket.userDebtShare(aliceAddress);
@@ -2058,18 +2023,12 @@ describe("FlatMarket", () => {
             );
             accruedInterest = accruedInterest.add(interest);
             totalDebtValue = totalDebtValue.add(interest);
-            const bobDebtValBefore = debtHelpers.debtShareToValue(
-              bobDebtShareBefore,
-              totalDebtShare,
-              totalDebtValue,
-              false
-            );
+            const bobDebtValBefore = debtHelpers.debtShareToValue(bobDebtShareBefore, totalDebtShare, totalDebtValue);
             // Calculate expected debtShare to be taken from Bob
             const bobActualTakenDebtShare = debtHelpers.debtValueToShare(
               bobTakenDebtValue,
               totalDebtShare,
-              totalDebtValue,
-              true
+              totalDebtValue
             );
             const liquidationFee = bobTakenDebtValue
               .mul(LIQUIDATION_PENALTY)
@@ -2094,8 +2053,7 @@ describe("FlatMarket", () => {
             expect(await usdcUsdtLpMarket.userDebtShare(treasuryHolder.address)).to.be.eq(0);
 
             const userDebtValue = await usdcUsdtLpMarket.debtShareToValue(
-              bobDebtShareBefore.sub(bobActualTakenDebtShare),
-              false
+              bobDebtShareBefore.sub(bobActualTakenDebtShare)
             );
             // Treasury withdraw surplus, expect to get both accruedInterest and liquidation fee
             const treasuryFlatBefore = await clerk.balanceOf(flat.address, treasuryHolder.address);
@@ -2474,7 +2432,6 @@ describe("FlatMarket", () => {
 
       beforeEach(async () => {
         // Turn off interest before borrow
-        // Turn off interest before borrow
         await flatMarketConfig.setConfig(
           [usdcUsdtLpMarket.address],
           [
@@ -2672,9 +2629,9 @@ describe("FlatMarket", () => {
           expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(0);
           expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount);
           expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
-          expect(
-            await usdcUsdtLpMarket.debtShareToValue(await usdcUsdtLpMarket.userDebtShare(aliceAddress), true)
-          ).to.be.eq(totalDebtValue.sub(repayFunds));
+          expect(await usdcUsdtLpMarket.debtShareToValue(await usdcUsdtLpMarket.userDebtShare(aliceAddress))).to.be.eq(
+            totalDebtValue.sub(repayFunds)
+          );
         });
       });
     });
@@ -2708,8 +2665,7 @@ describe("FlatMarket", () => {
         const expectedBobDebtShare = debtHelpers.debtValueToShare(
           bobBorrowAmount,
           totalDebtShareBefore,
-          totalDebtValue,
-          true
+          totalDebtValue
         );
 
         const expectedTotalCollateral = collateralAmount.add(bobCollateralAmount);
@@ -2761,18 +2717,12 @@ describe("FlatMarket", () => {
           );
 
           // Calculate Alice's debtValue, Alice's debtShare is equal to her borrowAmount
-          const expectedDebtShareToDeduct = debtHelpers.debtValueToShare(
-            repayFunds,
-            totalDebtShare,
-            totalDebtValue,
-            false
-          );
+          const expectedDebtShareToDeduct = debtHelpers.debtValueToShare(repayFunds, totalDebtShare, totalDebtValue);
           const expectedAliceDebtShare = borrowAmount.sub(expectedDebtShareToDeduct);
           const expectedAliceDebtValue = debtHelpers.debtShareToValue(
             expectedAliceDebtShare,
             totalDebtShare.sub(expectedDebtShareToDeduct),
-            totalDebtValue.sub(repayFunds),
-            true
+            totalDebtValue.sub(repayFunds)
           );
 
           expect(usdcUsdtLpMarketFlatAfter.sub(usdcUsdtLpMarketFlatBefore)).to.be.eq(repayFunds);
@@ -2785,9 +2735,9 @@ describe("FlatMarket", () => {
           expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
           expect(await usdcUsdtLpMarket.userCollateralShare(bobAddress)).to.be.eq(bobCollateralAmount);
           expect(await usdcUsdtLpMarket.userDebtShare(aliceAddress)).to.be.eq(expectedAliceDebtShare);
-          expect(
-            await usdcUsdtLpMarket.debtShareToValue(await usdcUsdtLpMarket.userDebtShare(aliceAddress), true)
-          ).to.be.eq(expectedAliceDebtValue);
+          expect(await usdcUsdtLpMarket.debtShareToValue(await usdcUsdtLpMarket.userDebtShare(aliceAddress))).to.be.eq(
+            expectedAliceDebtValue
+          );
         });
       });
 
@@ -2808,12 +2758,7 @@ describe("FlatMarket", () => {
           );
 
           // Calculate Alice's debtValue, Alice's debtShare is equal to her borrowAmount
-          const expectedAliceDebtValue = debtHelpers.debtShareToValue(
-            borrowAmount,
-            totalDebtShare,
-            totalDebtValue,
-            true
-          );
+          const expectedAliceDebtValue = debtHelpers.debtShareToValue(borrowAmount, totalDebtShare, totalDebtValue);
 
           expect(usdcUsdtLpMarketFlatAfter.sub(usdcUsdtLpMarketFlatBefore)).to.be.eq(expectedAliceDebtValue);
           expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
