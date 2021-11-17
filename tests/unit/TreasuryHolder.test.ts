@@ -75,7 +75,10 @@ describe("TreasuryHolder", () => {
         it("should be able to change a bad debt market boolean and the count", async () => {
           // mock onBadDebt to be a deployer
           await clerk.whitelistMarket(flatMarkets[0].address, true);
-          await fromMockContract<MockFlatMarketForTreasuryHolder>(flatMarkets[0]).mockOnBadDebtCall();
+          await fromMockContract<MockFlatMarketForTreasuryHolder>(flatMarkets[0]).mockOnBadDebtCall(parseEther("168"));
+
+          expect(await treasuryHolder.totalBadDebtValue()).to.eq(parseEther("168"));
+          expect(await treasuryHolder.badDebtMarkets(flatMarkets[0].address)).to.eq(parseEther("168"));
           // mock as if treasury holder have the fee in the pocket
           await flat.approve(clerk.address, parseEther("1000"));
           await (clerk as unknown as Clerk).deposit(
@@ -85,26 +88,12 @@ describe("TreasuryHolder", () => {
             parseEther("1000"),
             0
           );
-
-          // mock flat market variables
-          await flatMarkets[0].setVariable("userDebtShare", {
-            [treasuryHolder.address]: parseEther("168").toString(),
-          });
-
-          await flatMarkets[0].setVariable("totalDebtValue", parseEther("168").toString());
-
-          await flatMarkets[0].setVariable("totalDebtShare", parseEther("168").toString());
-
-          await flatMarkets[0].setVariable("collateralPrice", parseEther("100").toString());
-
-          // mock oracle returned value
-          compositeOracle.get.returns([true, parseEther("100")]);
-
           await expect(treasuryHolder.settleBadDebt([flatMarkets[0].address]))
-            .to.emit(flatMarkets[0], "LogRepay")
-            .withArgs(treasuryHolder.address, treasuryHolder.address, parseEther("168"), parseEther("168"))
             .to.emit(treasuryHolder, "LogBadDebt")
-            .withArgs(flatMarkets[0].address, false, 0);
+            .withArgs(flatMarkets[0].address, parseEther("168"));
+          expect(await fromMockContract<Clerk>(clerk).balanceOf(flat.address, flatMarkets[0].address)).to.eq(
+            parseEther("168")
+          );
         });
       });
 
@@ -113,8 +102,8 @@ describe("TreasuryHolder", () => {
           // mock onBadDebt to be a deployer
           await clerk.whitelistMarket(flatMarkets[0].address, true);
           await clerk.whitelistMarket(flatMarkets[1].address, true);
-          await fromMockContract<MockFlatMarketForTreasuryHolder>(flatMarkets[0]).mockOnBadDebtCall();
-          await fromMockContract<MockFlatMarketForTreasuryHolder>(flatMarkets[1]).mockOnBadDebtCall();
+          await fromMockContract<MockFlatMarketForTreasuryHolder>(flatMarkets[0]).mockOnBadDebtCall(parseEther("168"));
+          await fromMockContract<MockFlatMarketForTreasuryHolder>(flatMarkets[1]).mockOnBadDebtCall(parseEther("168"));
           // mock as if treasury holder have the fee in the pocket
           await flat.approve(clerk.address, parseEther("1000"));
           await (clerk as unknown as Clerk).deposit(
@@ -125,35 +114,17 @@ describe("TreasuryHolder", () => {
             0
           );
 
-          // mock flat market variables
-          await flatMarkets[0].setVariable("userDebtShare", {
-            [treasuryHolder.address]: parseEther("168").toString(),
-          });
-
-          await flatMarkets[0].setVariable("totalDebtValue", parseEther("168").toString());
-
-          await flatMarkets[0].setVariable("totalDebtShare", parseEther("168").toString());
-
-          await flatMarkets[0].setVariable("collateralPrice", parseEther("100").toString());
-
-          await flatMarkets[1].setVariable("userDebtShare", {
-            [treasuryHolder.address]: parseEther("666").toString(),
-          });
-
-          await flatMarkets[1].setVariable("totalDebtValue", parseEther("666").toString());
-
-          await flatMarkets[1].setVariable("totalDebtShare", parseEther("666").toString());
-
-          await flatMarkets[1].setVariable("collateralPrice", parseEther("100").toString());
-
-          // mock oracle returned value
-          compositeOracle.get.returns([true, parseEther("100")]);
-
-          await expect(treasuryHolder.settleBadDebt([flatMarkets[0].address]))
-            .to.emit(flatMarkets[0], "LogRepay")
-            .withArgs(treasuryHolder.address, treasuryHolder.address, parseEther("168"), parseEther("168"))
+          await expect(treasuryHolder.settleBadDebt([flatMarkets[0].address, flatMarkets[1].address]))
             .to.emit(treasuryHolder, "LogBadDebt")
-            .withArgs(flatMarkets[0].address, false, 1);
+            .withArgs(flatMarkets[0].address, parseEther("168"))
+            .to.emit(treasuryHolder, "LogBadDebt")
+            .withArgs(flatMarkets[1].address, parseEther("168"));
+          expect(await fromMockContract<Clerk>(clerk).balanceOf(flat.address, flatMarkets[0].address)).to.eq(
+            parseEther("168")
+          );
+          expect(await fromMockContract<Clerk>(clerk).balanceOf(flat.address, flatMarkets[1].address)).to.eq(
+            parseEther("168")
+          );
         });
       });
     });
@@ -163,7 +134,7 @@ describe("TreasuryHolder", () => {
     context("if there is a bad debt", () => {
       it("should revert", async () => {
         await clerk.whitelistMarket(flatMarkets[0].address, true);
-        await fromMockContract<MockFlatMarketForTreasuryHolder>(flatMarkets[0]).mockOnBadDebtCall();
+        await fromMockContract<MockFlatMarketForTreasuryHolder>(flatMarkets[0]).mockOnBadDebtCall(parseEther("1"));
 
         await expect(treasuryHolder.withdrawSurplus()).to.be.revertedWith(
           "TreasuryHolder::withdrawSurplus:: there are still bad debt markets"
