@@ -156,12 +156,25 @@ describe("CompositeOracle", () => {
           );
           const encodedToken = ethers.utils.defaultAbiCoder.encode(["address"], [simpleToken.address]);
 
-          await mockOracles[0].peek.returns([true, ethers.utils.parseEther("50")]);
+          const cases = [
+            {
+              prices: [ethers.utils.parseEther("50"), ethers.utils.parseEther("75")],
+              expectedPrice: ethers.utils.parseEther("50"),
+            },
+            {
+              prices: [ethers.utils.parseEther("75"), ethers.utils.parseEther("50")],
+              expectedPrice: ethers.utils.parseEther("75"),
+            },
+          ];
 
-          await mockOracles[1].peek.returns([true, ethers.utils.parseEther("75")]);
+          for (const index in cases) {
+            await mockOracles[0].peek.returns([true, cases[index].prices[0]]);
 
-          const [_, expected] = await compositeOracle.get(encodedToken);
-          expect(expected).to.eq(ethers.utils.parseEther("50"));
+            await mockOracles[1].peek.returns([true, cases[index].prices[1]]);
+
+            const [_, expected] = await compositeOracle.get(encodedToken);
+            expect(expected, `case: ${index}`).to.eq(cases[index].expectedPrice);
+          }
         });
       });
       context("when there are 3 primary sources", () => {
@@ -174,20 +187,36 @@ describe("CompositeOracle", () => {
               mockOracles.slice(0, 3).map((_, index) => ethers.utils.defaultAbiCoder.encode(["uint256"], [index]))
             );
             const encodedToken = ethers.utils.defaultAbiCoder.encode(["address"], [simpleToken.address]);
+            const cases = [
+              {
+                prices: [ethers.utils.parseEther("50"), ethers.utils.parseEther("75"), ethers.utils.parseEther("100")],
+                expectedPrice: ethers.utils.parseEther("50"),
+              },
+              {
+                prices: [ethers.utils.parseEther("75"), ethers.utils.parseEther("70"), ethers.utils.parseEther("100")],
+                expectedPrice: ethers.utils.parseEther("75"),
+              },
+              {
+                prices: [ethers.utils.parseEther("75"), ethers.utils.parseEther("70"), ethers.utils.parseEther("65")],
+                expectedPrice: ethers.utils.parseEther("75"),
+              },
+            ];
 
-            await mockOracles[0].peek.returns([true, ethers.utils.parseEther("50")]);
+            for (const index in cases) {
+              await mockOracles[0].peek.returns([true, cases[index].prices[0]]);
 
-            await mockOracles[1].peek.returns([true, ethers.utils.parseEther("75")]);
+              await mockOracles[1].peek.returns([true, cases[index].prices[1]]);
 
-            await mockOracles[2].peek.returns([true, ethers.utils.parseEther("100")]);
+              await mockOracles[2].peek.returns([true, cases[index].prices[2]]);
 
-            const [_, expected] = await compositeOracle.get(encodedToken);
-            expect(expected).to.eq(ethers.utils.parseEther("50"));
+              const [_, expected] = await compositeOracle.get(encodedToken);
+              expect(expected, `case: ${index}`).to.eq(cases[index].expectedPrice);
+            }
           });
         });
 
         context("when [price0, price1] is valid and [price1, price2] is invalid", () => {
-          it("should use the first price", async () => {
+          it("should use the price from the most priority after sorted and compare", async () => {
             await compositeOracle.setPrimarySources(
               simpleToken.address,
               ethers.utils.parseUnits("1.5", 18),
@@ -196,19 +225,40 @@ describe("CompositeOracle", () => {
             );
             const encodedToken = ethers.utils.defaultAbiCoder.encode(["address"], [simpleToken.address]);
 
-            await mockOracles[0].peek.returns([true, ethers.utils.parseEther("50")]);
+            const cases = [
+              {
+                prices: [ethers.utils.parseEther("50"), ethers.utils.parseEther("75"), ethers.utils.parseEther("150")],
+                expectedPrice: ethers.utils.parseEther("50"),
+              },
+              {
+                prices: [ethers.utils.parseEther("75"), ethers.utils.parseEther("70"), ethers.utils.parseEther("150")],
+                expectedPrice: ethers.utils.parseEther("75"),
+              },
+              {
+                prices: [ethers.utils.parseEther("50"), ethers.utils.parseEther("75"), ethers.utils.parseEther("101")],
+                expectedPrice: ethers.utils.parseEther("50"),
+              },
+              {
+                prices: [ethers.utils.parseEther("75"), ethers.utils.parseEther("70"), ethers.utils.parseEther("101")],
+                expectedPrice: ethers.utils.parseEther("75"),
+              },
+            ];
 
-            await mockOracles[1].peek.returns([true, ethers.utils.parseEther("75")]);
+            for (const index in cases) {
+              await mockOracles[0].peek.returns([true, cases[index].prices[0]]);
 
-            await mockOracles[2].peek.returns([true, ethers.utils.parseEther("150")]);
+              await mockOracles[1].peek.returns([true, cases[index].prices[1]]);
 
-            const [_, expected] = await compositeOracle.get(encodedToken);
-            expect(expected).to.eq(ethers.utils.parseEther("50"));
+              await mockOracles[2].peek.returns([true, cases[index].prices[2]]);
+
+              const [_, expected] = await compositeOracle.get(encodedToken);
+              expect(expected, `case: ${index}`).to.eq(cases[index].expectedPrice);
+            }
           });
         });
 
         context("when [price0, price1] is invalid and [price1, price2] is valid", () => {
-          it("should use the second price", async () => {
+          it("should use the price from the most priority after sorted and compare", async () => {
             await compositeOracle.setPrimarySources(
               simpleToken.address,
               ethers.utils.parseUnits("1.5", 18),
@@ -217,14 +267,35 @@ describe("CompositeOracle", () => {
             );
             const encodedToken = ethers.utils.defaultAbiCoder.encode(["address"], [simpleToken.address]);
 
-            await mockOracles[0].peek.returns([true, ethers.utils.parseEther("150")]);
+            const cases = [
+              {
+                prices: [ethers.utils.parseEther("20"), ethers.utils.parseEther("75"), ethers.utils.parseEther("100")],
+                expectedPrice: ethers.utils.parseEther("75"),
+              },
+              {
+                prices: [ethers.utils.parseEther("20"), ethers.utils.parseEther("100"), ethers.utils.parseEther("75")],
+                expectedPrice: ethers.utils.parseEther("100"),
+              },
+              {
+                prices: [ethers.utils.parseEther("49"), ethers.utils.parseEther("75"), ethers.utils.parseEther("100")],
+                expectedPrice: ethers.utils.parseEther("75"),
+              },
+              {
+                prices: [ethers.utils.parseEther("49"), ethers.utils.parseEther("100"), ethers.utils.parseEther("75")],
+                expectedPrice: ethers.utils.parseEther("100"),
+              },
+            ];
 
-            await mockOracles[1].peek.returns([true, ethers.utils.parseEther("75")]);
+            for (const index in cases) {
+              await mockOracles[0].peek.returns([true, cases[index].prices[0]]);
 
-            await mockOracles[2].peek.returns([true, ethers.utils.parseEther("100")]);
+              await mockOracles[1].peek.returns([true, cases[index].prices[1]]);
 
-            const [_, expected] = await compositeOracle.get(encodedToken);
-            expect(expected).to.eq(ethers.utils.parseEther("75"));
+              await mockOracles[2].peek.returns([true, cases[index].prices[2]]);
+
+              const [_, expected] = await compositeOracle.get(encodedToken);
+              expect(expected, `case: ${index}`).to.eq(cases[index].expectedPrice);
+            }
           });
         });
 

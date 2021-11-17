@@ -126,7 +126,8 @@ contract CompositeOracle is IOracle, Initializable, AccessControlUpgradeable {
     address _token = abi.decode(_data, (address));
     uint256 _candidateSourceCount = primarySourceCount[_token];
     require(_candidateSourceCount > 0, "CompositeOracle::_get::no primary source");
-    uint256[] memory _prices = new uint256[](_candidateSourceCount);
+    uint256[] memory _prices = new uint256[](_candidateSourceCount); // the less index, the higher priority
+    uint256[] memory _unsortedPrices = new uint256[](_candidateSourceCount);
 
     // Get valid oracle sources
     uint256 _validSourceCount = 0;
@@ -135,6 +136,7 @@ contract CompositeOracle is IOracle, Initializable, AccessControlUpgradeable {
         bool, /*isSuccess*/
         uint256 price
       ) {
+        _unsortedPrices[_validSourceCount] = price;
         _prices[_validSourceCount++] = price;
       } catch {}
     }
@@ -159,7 +161,7 @@ contract CompositeOracle is IOracle, Initializable, AccessControlUpgradeable {
     //     --> if none, revert
     // - revert otherwise
     if (_validSourceCount == 1) {
-      return _prices[0]; // if 1 valid source, return that price
+      return _unsortedPrices[0]; // if 1 valid source, return that price
     }
 
     if (_validSourceCount == 2) {
@@ -167,7 +169,7 @@ contract CompositeOracle is IOracle, Initializable, AccessControlUpgradeable {
         (_prices[1] * 1e18) / _prices[0] <= _maxPriceDeviation,
         "CompositeOracle::_get::too much deviation (2 valid sources)"
       );
-      return _prices[0]; // if 2 valid sources,  return the first registered price
+      return _unsortedPrices[0]; // if 2 valid sources,  return the first registered price
     }
 
     if (_validSourceCount == 3) {
@@ -175,21 +177,41 @@ contract CompositeOracle is IOracle, Initializable, AccessControlUpgradeable {
       bool _maxMidOk = (_prices[2] * 1e18) / _prices[1] <= _maxPriceDeviation;
 
       if (_midMinOk && _maxMidOk) {
-        return _prices[0]; // if 3 valid sources, use the first price
+        return _unsortedPrices[0]; // if 3 valid sources, use the first price
       }
 
       if (_midMinOk) {
-        return _prices[0]; // use the first price
+        return _getPriceBasedOnPriorities(_unsortedPrices, _prices[0], _prices[1]);
       }
 
       if (_maxMidOk) {
-        return _prices[1]; // return the second price
+        return _getPriceBasedOnPriorities(_unsortedPrices, _prices[1], _prices[2]);
       }
 
       revert("CompositeOracle::_get::too much deviation (3 valid sources)");
     }
 
     revert("CompositeOracle::_get::more than 3 valid sources not supported");
+  }
+
+  /// @dev internal function for getting a price based on priorities
+  /// this is used when there are 3 valid sources
+  /// @param _priceBasedOnPriorities Unsorted prices
+  /// @param _p1 The first price
+  /// @param _p2 The second price
+
+  function _getPriceBasedOnPriorities(
+    uint256[] memory _priceBasedOnPriorities,
+    uint256 _p1,
+    uint256 _p2
+  ) internal pure returns (uint256) {
+    if (_priceBasedOnPriorities[0] == _p1 || _priceBasedOnPriorities[0] == _p2) {
+      return _priceBasedOnPriorities[0]; // if 2 valid sources, just validate if one of them are the one having the most priorities, otherwise return the first one
+    }
+    if (_priceBasedOnPriorities[1] == _p1 || _priceBasedOnPriorities[1] == _p2) {
+      return _priceBasedOnPriorities[1]; // if 2 valid sources, just validate if one of them are the one having the most priorities, otherwise return the first one
+    }
+    return _priceBasedOnPriorities[2];
   }
 
   /// @dev Check the current spot exchange rate without any state changes
