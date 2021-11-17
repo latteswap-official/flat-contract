@@ -627,9 +627,9 @@ contract MockFlatMarketForTreasuryHolder is OwnableUpgradeable, ReentrancyGuardU
     return (_surplus, _liquidationFee);
   }
 
-  function mockOnBadDebtCall() external {
+  function mockOnBadDebtCall(uint256 _badDebtValue) external {
     require(marketConfig.treasury() != address(0), "bad treasury");
 
-    ITreasuryHolderCallback(marketConfig.treasury()).onBadDebt();
+    ITreasuryHolderCallback(marketConfig.treasury()).onBadDebt(_badDebtValue);
   }
 }

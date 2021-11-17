@@ -257,26 +257,19 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
   /// @notice Return the debt value of the given debt share.
   /// @param _debtShare The debt share to be convered.
-  /// @param _roundUp If true, then check whether it is needed to round up or not.
-  function debtShareToValue(uint256 _debtShare, bool _roundUp) public view returns (uint256) {
+  function debtShareToValue(uint256 _debtShare) public view returns (uint256) {
     if (totalDebtShare == 0) return _debtShare;
     uint256 _debtValue = (_debtShare * totalDebtValue) / totalDebtShare;
-    if (_roundUp && (_debtValue * totalDebtShare) / totalDebtValue < _debtShare) {
-      return _debtValue + 1;
-    }
     return _debtValue;
   }
 
   /// @notice Return the debt share for the given debt value.
+  /// @dev debt share will always be rounded up to prevent tiny share.
   /// @param _debtValue The debt value to be converted.
-  /// @param _roundUp If true, then check whether it is needed to round up or not.
   function debtValueToShare(uint256 _debtValue, bool _roundUp) public view returns (uint256) {
     if (totalDebtShare == 0) return _debtValue;
     uint256 _debtShare = (_debtValue * totalDebtShare) / totalDebtValue;
-    if (_roundUp && (_debtShare * (totalDebtValue)) / totalDebtShare < _debtValue) {
-      return _debtShare + 1;
-    }
-    return _debtShare;
+    return _debtShare + 1;
   }
 
   /// @notice Deposit collateral to Clerk.
@@ -336,7 +329,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   function depositAndRepay(address _for, uint256 _maxDebtReturn) external nonReentrant accrue returns (uint256) {
     updateCollateralPrice();
     // 1. Find out how much debt to repaid
-    uint256 _debtValue = MathUpgradeable.min(_maxDebtReturn, debtShareToValue(userDebtShare[_for], true));
+    uint256 _debtValue = MathUpgradeable.min(_maxDebtReturn, debtShareToValue(userDebtShare[_for]));
 
     // 2. Deposit FLAT to Clerk
     _vaultDeposit(flat, msg.sender, _debtValue, 0);
@@ -364,7 +357,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     uint256 _maxPrice
   ) external nonReentrant accrue updateCollateralPriceWithSlippageCheck(_minPrice, _maxPrice) checkSafe {
     // 1. Find out how much debt to repaid
-    uint256 _debtValue = MathUpgradeable.min(_maxDebtReturn, debtShareToValue(userDebtShare[_to], true));
+    uint256 _debtValue = MathUpgradeable.min(_maxDebtReturn, debtShareToValue(userDebtShare[_to]));
 
     // 2. Deposit FLAT to Vault for preparing to settle the debt
     _vaultDeposit(flat, msg.sender, _debtValue, 0);
@@ -414,7 +407,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         // 4.1.1. Findout how much debt share to liquidate
         uint256 _lessDebtShare = MathUpgradeable.min(_maxDebtShares[i], userDebtShare[_user]);
         // 4.1.2. Convert debt share to FLAT value
-        uint256 _borrowAmount = debtShareToValue(_lessDebtShare, false);
+        uint256 _borrowAmount = debtShareToValue(_lessDebtShare);
         // 4.1.3. Calculate collateral share to be taken out by liquidator
         uint256 _collateralShare = _clerkTotals.toShare(
           (_borrowAmount * _liquidationPenalty * COLLATERAL_PRICE_PRECISION) / (BPS_PRECISION * _collateralPrice),
@@ -454,7 +447,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
         // Then it is bad debt. Hence move user's debt share to treasury.
         // Treausry will settle bad debt later by surplus or liquidation fee
         if (userCollateralShare[_user] == 0 && userDebtShare[_user] != 0) {
-          uint256 _badDebtValue = debtShareToValue(userDebtShare[_user], false);
+          uint256 _badDebtValue = debtShareToValue(userDebtShare[_user]);
           totalDebtShare = totalDebtShare - userDebtShare[_user];
           totalDebtValue = totalDebtValue - _badDebtValue;
           userDebtShare[_user] = 0;
@@ -556,7 +549,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   /// @param _debtValue The debt value to be repaid.
   function _repay(address _for, uint256 _debtValue) internal returns (uint256 _debtShare) {
     // 1. Findout "_debtShare" from the given "_debtValue"
-    _debtShare = debtValueToShare(_debtValue, false);
+    _debtShare = debtValueToShare(_debtValue, true);
 
     // 2. Update user's debtShare
     userDebtShare[_for] = userDebtShare[_for] - _debtShare;
@@ -577,7 +570,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   /// @param _maxDebtValue The maximum amount of FLAT to be repaid.
   function repay(address _for, uint256 _maxDebtValue) external nonReentrant accrue returns (uint256) {
     updateCollateralPrice();
-    uint256 _debtValue = MathUpgradeable.min(_maxDebtValue, debtShareToValue(userDebtShare[_for], true));
+    uint256 _debtValue = MathUpgradeable.min(_maxDebtValue, debtShareToValue(userDebtShare[_for]));
     _repay(_for, _debtValue);
     return _debtValue;
   }
