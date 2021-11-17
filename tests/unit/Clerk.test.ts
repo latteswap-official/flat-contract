@@ -4,14 +4,7 @@ import { solidity } from "ethereum-waffle";
 import { clerkUnitTestFixture } from "../helpers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { Wallet } from "@ethersproject/wallet";
-import {
-  Clerk,
-  Clerk__factory,
-  MockEvilFlashLoaner,
-  MockFlashLoaner,
-  SimpleToken,
-  SimpleToken__factory,
-} from "../../typechain/v8";
+import { Clerk, Clerk__factory, NonNativeReceivableToken, SimpleToken, SimpleToken__factory } from "../../typechain/v8";
 import { BigNumber, constants } from "ethers";
 import { MockContract } from "@defi-wonderland/smock";
 import { MockWBNB } from "@latteswap/latteswap-contract/compiled-typechain";
@@ -29,6 +22,7 @@ describe("Clerk", () => {
   let wbnb: MockWBNB;
   let clerk: MockContract<Clerk>;
   let stakingTokens: Array<SimpleToken>;
+  let nonNativeReceivableToken: NonNativeReceivableToken;
 
   const extremeValidVolume = BigNumber.from(2).pow(127);
   const vaultProtocolLimit = BigNumber.from(2).pow(128).sub(1);
@@ -37,8 +31,6 @@ describe("Clerk", () => {
   // contract as a user
   let clerkAsAlice: Clerk;
   let stakingToken0AsAlice: SimpleToken;
-  let flashloaner: MockFlashLoaner;
-  let evilFlashloaner: MockEvilFlashLoaner;
 
   beforeEach(async () => {
     ({
@@ -49,8 +41,7 @@ describe("Clerk", () => {
       wbnb,
       clerk,
       stakingTokens,
-      flashloaner,
-      evilFlashloaner,
+      nonNativeReceivableToken,
     } = await waffle.loadFixture(clerkUnitTestFixture));
 
     clerkAsAlice = Clerk__factory.connect(clerk.address, alice);
@@ -677,9 +668,16 @@ describe("Clerk", () => {
         await expect(
           clerk
             .connect(bob)
-            .withdraw(wbnb.address, bob.address, flashloaner.address, ethers.utils.parseEther("1").sub(100000), 0, {
-              from: bob.address,
-            })
+            .withdraw(
+              wbnb.address,
+              bob.address,
+              nonNativeReceivableToken.address,
+              ethers.utils.parseEther("1").sub(100000),
+              0,
+              {
+                from: bob.address,
+              }
+            )
         ).to.be.revertedWith("Clerk::withdraw:: BNB transfer failed");
       });
     });

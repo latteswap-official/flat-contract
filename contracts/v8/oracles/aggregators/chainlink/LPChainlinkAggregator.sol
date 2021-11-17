@@ -7,11 +7,11 @@
  */
 
 pragma solidity 0.8.9;
-
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "../../../libraries/LatteMath.sol";
+
 import "@latteswap/latteswap-contract/contracts/swap/interfaces/ILatteSwapPair.sol";
-import "../libraries/LatteMath.sol";
-import "../interfaces/IChainlinkAggregator.sol";
+import "../../../interfaces/IChainlinkAggregator.sol";
 
 /// @title LPChainlinkAggregator
 /// @notice Oracle used for getting the price of an LP token
@@ -35,7 +35,7 @@ contract LPChainlinkAggregator is IChainlinkAggregator, Initializable {
     token1Oracle = _token1Oracle;
   }
 
-  // Calculates the lastest exchange rate representing token value in USD
+  // Calculates the lastest exchange rate representing token value in USD with 18 decimals
   function latestAnswer() external view override returns (int256) {
     uint256 _totalSupply = ILatteSwapPair(pair).totalSupply();
     (uint256 _r0, uint256 _r1, ) = ILatteSwapPair(pair).getReserves();
@@ -48,7 +48,7 @@ contract LPChainlinkAggregator is IChainlinkAggregator, Initializable {
     // fair lp price = 2 * sqrt(_px0 * _px1)
     // split into 2 sqrts multiplication to prevent uint overflow (note the 2**112)
 
-    uint256 _totalValue = (((_sqrtK * (2) * (LatteMath.sqrt(_px0))) / (2**56)) * (LatteMath.sqrt(_px1))) / (2**56);
+    uint256 _totalValue = (((_sqrtK * 2 * (LatteMath.sqrt(_px0))) / (2**56)) * (LatteMath.sqrt(_px1))) / (2**56);
     return int256(((_totalValue) * 10**10) / (2**112)); // change from 2**112 to 2**18
   }
 }

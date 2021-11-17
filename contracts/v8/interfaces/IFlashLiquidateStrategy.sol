@@ -17,5 +17,5 @@ interface IFlashLiquidateStrategy {
     address recipient,
     uint256 shareToMin,
     uint256 shareFrom
-  ) external returns (uint256 extraShare, uint256 shareReturned);
+  ) external;
 }

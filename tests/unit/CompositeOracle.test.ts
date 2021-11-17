@@ -99,8 +99,8 @@ describe("CompositeOracle", () => {
           [mockOracles[0].address, mockOracles[1].address],
           [[], []]
         );
-        await mockOracles[0].peek.reverts("something went wrong");
-        await mockOracles[1].peek.reverts("something went wrong");
+        await mockOracles[0].get.reverts("something went wrong");
+        await mockOracles[1].get.reverts("something went wrong");
 
         await expect(
           compositeOracle.get(ethers.utils.defaultAbiCoder.encode(["address"], [simpleToken.address])),
@@ -121,7 +121,7 @@ describe("CompositeOracle", () => {
           const price = ethers.utils.parseEther("10");
           const encodedToken = ethers.utils.defaultAbiCoder.encode(["address"], [simpleToken.address]);
 
-          await mockOracles[0].peek.returns([true, price]);
+          await mockOracles[0].get.returns([true, price]);
 
           const [_, expected] = await compositeOracle.get(encodedToken);
           expect(expected).to.eq(price);
@@ -138,9 +138,9 @@ describe("CompositeOracle", () => {
             );
             const encodedToken = ethers.utils.defaultAbiCoder.encode(["address"], [simpleToken.address]);
 
-            await mockOracles[0].peek.returns([true, ethers.utils.parseEther("50")]);
+            await mockOracles[0].get.returns([true, ethers.utils.parseEther("50")]);
 
-            await mockOracles[1].peek.returns([true, ethers.utils.parseEther("100")]); //50% diff with price0
+            await mockOracles[1].get.returns([true, ethers.utils.parseEther("100")]); //50% diff with price0
 
             await expect(compositeOracle.get(encodedToken)).to.revertedWith(
               "CompositeOracle::_get::too much deviation (2 valid sources)"
@@ -168,9 +168,9 @@ describe("CompositeOracle", () => {
           ];
 
           for (const index in cases) {
-            await mockOracles[0].peek.returns([true, cases[index].prices[0]]);
+            await mockOracles[0].get.returns([true, cases[index].prices[0]]);
 
-            await mockOracles[1].peek.returns([true, cases[index].prices[1]]);
+            await mockOracles[1].get.returns([true, cases[index].prices[1]]);
 
             const [_, expected] = await compositeOracle.get(encodedToken);
             expect(expected, `case: ${index}`).to.eq(cases[index].expectedPrice);
@@ -203,11 +203,11 @@ describe("CompositeOracle", () => {
             ];
 
             for (const index in cases) {
-              await mockOracles[0].peek.returns([true, cases[index].prices[0]]);
+              await mockOracles[0].get.returns([true, cases[index].prices[0]]);
 
-              await mockOracles[1].peek.returns([true, cases[index].prices[1]]);
+              await mockOracles[1].get.returns([true, cases[index].prices[1]]);
 
-              await mockOracles[2].peek.returns([true, cases[index].prices[2]]);
+              await mockOracles[2].get.returns([true, cases[index].prices[2]]);
 
               const [_, expected] = await compositeOracle.get(encodedToken);
               expect(expected, `case: ${index}`).to.eq(cases[index].expectedPrice);
@@ -245,11 +245,11 @@ describe("CompositeOracle", () => {
             ];
 
             for (const index in cases) {
-              await mockOracles[0].peek.returns([true, cases[index].prices[0]]);
+              await mockOracles[0].get.returns([true, cases[index].prices[0]]);
 
-              await mockOracles[1].peek.returns([true, cases[index].prices[1]]);
+              await mockOracles[1].get.returns([true, cases[index].prices[1]]);
 
-              await mockOracles[2].peek.returns([true, cases[index].prices[2]]);
+              await mockOracles[2].get.returns([true, cases[index].prices[2]]);
 
               const [_, expected] = await compositeOracle.get(encodedToken);
               expect(expected, `case: ${index}`).to.eq(cases[index].expectedPrice);
@@ -287,11 +287,11 @@ describe("CompositeOracle", () => {
             ];
 
             for (const index in cases) {
-              await mockOracles[0].peek.returns([true, cases[index].prices[0]]);
+              await mockOracles[0].get.returns([true, cases[index].prices[0]]);
 
-              await mockOracles[1].peek.returns([true, cases[index].prices[1]]);
+              await mockOracles[1].get.returns([true, cases[index].prices[1]]);
 
-              await mockOracles[2].peek.returns([true, cases[index].prices[2]]);
+              await mockOracles[2].get.returns([true, cases[index].prices[2]]);
 
               const [_, expected] = await compositeOracle.get(encodedToken);
               expect(expected, `case: ${index}`).to.eq(cases[index].expectedPrice);
@@ -309,11 +309,11 @@ describe("CompositeOracle", () => {
             );
             const encodedToken = ethers.utils.defaultAbiCoder.encode(["address"], [simpleToken.address]);
 
-            await mockOracles[0].peek.returns([true, ethers.utils.parseEther("15000")]);
+            await mockOracles[0].get.returns([true, ethers.utils.parseEther("15000")]);
 
-            await mockOracles[1].peek.returns([true, ethers.utils.parseEther("1")]);
+            await mockOracles[1].get.returns([true, ethers.utils.parseEther("1")]);
 
-            await mockOracles[2].peek.returns([true, ethers.utils.parseEther("1000")]);
+            await mockOracles[2].get.returns([true, ethers.utils.parseEther("1000")]);
 
             await expect(compositeOracle.get(encodedToken)).to.revertedWith(
               "CompositeOracle::_get::too much deviation (3 valid sources)"

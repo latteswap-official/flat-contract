@@ -85,7 +85,6 @@ contract LatteSwapYieldStrategy is IStrategy, OwnableUpgradeable, PausableUpgrad
   }
 
   // Send the assets to the Strategy and call skim to invest them
-  /// @inheritdoc IStrategy
   function deposit(bytes calldata _data) external override onlyGovernance whenNotPaused {
     (uint256 _amount, address _sender, , uint256 _stake) = abi.decode(_data, (uint256, address, uint256, uint256));
     // turns amount with n decimal into WAD
@@ -104,7 +103,6 @@ contract LatteSwapYieldStrategy is IStrategy, OwnableUpgradeable, PausableUpgrad
   }
 
   // Harvest any profits made converted to the asset and pass them to the caller
-  /// @inheritdoc IStrategy
   function harvest(bytes calldata _data) public override onlyGovernance whenNotPaused returns (int256 _amountAdded) {
     (, address _sender, uint256 _totalShare, uint256 _stake) = abi.decode(_data, (uint256, address, uint256, uint256));
     _harvest(_sender, _totalShare, _stake);
@@ -140,7 +138,6 @@ contract LatteSwapYieldStrategy is IStrategy, OwnableUpgradeable, PausableUpgrad
   }
 
   // Withdraw assets. The returned amount can differ from the requested amount due to rounding or if the request was more than there is.
-  /// @inheritdoc IStrategy
   function withdraw(bytes calldata _data)
     external
     override
@@ -165,7 +162,6 @@ contract LatteSwapYieldStrategy is IStrategy, OwnableUpgradeable, PausableUpgrad
   }
 
   // Withdraw all assets in the safest way possible. This shouldn't fail.
-  /// @inheritdoc IStrategy
   function exit(uint256 balance) external override onlyGovernance whenNotPaused returns (int256 _amountAdded) {
     latteBooster.emergencyWithdraw(address(stakingToken));
 

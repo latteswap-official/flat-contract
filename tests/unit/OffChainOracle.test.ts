@@ -71,7 +71,7 @@ describe("OffChainOracle", () => {
             [simpleTokens[1].address, simpleTokens[0].address],
             [ethers.utils.parseEther("100"), ethers.utils.parseEther("0.01")]
           );
-        let [, price] = await offChainOracle.peek(
+        let [, price] = await offChainOracle.get(
           ethers.utils.defaultAbiCoder.encode(
             ["address", "address"],
             [simpleTokens[0].address, simpleTokens[1].address]
@@ -80,7 +80,7 @@ describe("OffChainOracle", () => {
 
         expect(price, "expect to get the correct price (should be 100)").to.eq(ethers.utils.parseEther("100"));
 
-        [, price] = await offChainOracle.peek(
+        [, price] = await offChainOracle.get(
           ethers.utils.defaultAbiCoder.encode(
             ["address", "address"],
             [simpleTokens[1].address, simpleTokens[0].address]
@@ -90,7 +90,7 @@ describe("OffChainOracle", () => {
         expect(price, "expect to get the correct price (should be 0.01)").to.eq(ethers.utils.parseEther("0.01"));
 
         await expect(
-          offChainOracle.peek(
+          offChainOracle.get(
             ethers.utils.defaultAbiCoder.encode(
               ["address", "address"],
               [simpleTokens[1].address, simpleTokens[1].address]

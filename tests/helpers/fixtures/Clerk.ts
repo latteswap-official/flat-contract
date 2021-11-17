@@ -6,20 +6,18 @@ import {
   SimpleToken__factory,
   Clerk,
   SimpleToken,
-  MockFlashLoaner__factory,
-  MockEvilFlashLoaner__factory,
-  MockFlashLoaner,
-  MockEvilFlashLoaner,
   LatteSwapYieldStrategy__factory,
   LatteSwapYieldStrategy,
   MockBoosterForLatteSwapYield,
   MockBoosterForLatteSwapYield__factory,
   MockMasterBaristaForLatteSwapYield,
   MockMasterBaristaForLatteSwapYield__factory,
+  NonNativeReceivableToken,
 } from "../../../typechain/v8";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { MockContract, smock } from "@defi-wonderland/smock";
 import { LATTE, LATTE__factory, MockWBNB, MockWBNB__factory } from "@latteswap/latteswap-contract/compiled-typechain";
+import { NonNativeReceivableToken__factory } from "../../../typechain/v8/factories/NonNativeReceivableToken__factory";
 
 export type IClerkUnitDTO = {
   deployer: SignerWithAddress;
@@ -29,8 +27,7 @@ export type IClerkUnitDTO = {
   wbnb: MockWBNB;
   clerk: MockContract<Clerk>;
   stakingTokens: Array<SimpleToken>;
-  flashloaner: MockFlashLoaner;
-  evilFlashloaner: MockEvilFlashLoaner;
+  nonNativeReceivableToken: NonNativeReceivableToken;
 };
 
 export type IClerkIntegrationDTO = {
@@ -71,14 +68,6 @@ export async function clerkUnitTestFixture(
   const wbnb = await MockWBNB.deploy();
   await wbnb.deployed();
 
-  const FlashLoaner = new MockFlashLoaner__factory(deployer);
-  const flashloaner = await FlashLoaner.deploy();
-  await flashloaner.deployed();
-
-  const EvilFlashLoaner = new MockEvilFlashLoaner__factory(deployer);
-  const evilFlashloaner = await EvilFlashLoaner.deploy();
-  await evilFlashloaner.deployed();
-
   // Deploy Clerk
   const Clerk = await smock.mock<Clerk__factory>("Clerk", deployer);
   const clerk: MockContract<Clerk> = await Clerk.deploy();
@@ -97,6 +86,8 @@ export async function clerkUnitTestFixture(
     stakingTokens.push(simpleToken);
   }
 
+  const nonNativeReceivableTokenFactory = new NonNativeReceivableToken__factory(deployer);
+  const nonNativeReceivableToken = (await nonNativeReceivableTokenFactory.deploy()) as NonNativeReceivableToken;
   return {
     deployer,
     alice,
@@ -105,8 +96,7 @@ export async function clerkUnitTestFixture(
     wbnb,
     clerk,
     stakingTokens,
-    evilFlashloaner,
-    flashloaner,
+    nonNativeReceivableToken,
   } as IClerkUnitDTO;
 }
 

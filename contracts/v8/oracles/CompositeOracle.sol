@@ -23,12 +23,12 @@ contract CompositeOracle is IOracle, Initializable, AccessControlUpgradeable {
   // Mapping from token to max price deviation (multiplied by 1e18)
   mapping(address => uint256) public maxPriceDeviations;
 
-  uint256 public constant MIN_PRICE_DEVIATION = 1e18;
-  uint256 public constant MAX_PRICE_DEVIATION = 1.5e18;
-
   bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
 
-  event LogSetPrimarySources(address indexed token, uint256 maxPriceDeviation, IOracle[] oracles);
+  uint256 public minPriceDeviation;
+  uint256 public maxPriceDeviation;
+
+  event LogSetPrimarySources(address indexed token, uint256 maxPriceDeviation, IOracle[] oracles, bytes[] oracleDatas);
 
   modifier onlyGovernance() {
     require(hasRole(GOVERNANCE_ROLE, _msgSender()), "CompositeOracle::onlyGovernance::only GOVERNANCE role");
@@ -40,6 +40,9 @@ contract CompositeOracle is IOracle, Initializable, AccessControlUpgradeable {
 
     _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
     _setupRole(GOVERNANCE_ROLE, _msgSender());
+
+    minPriceDeviation = 1e18;
+    maxPriceDeviation = 3e18;
   }
 
   /// @dev Set oracle primary sources for the token
@@ -97,7 +100,7 @@ contract CompositeOracle is IOracle, Initializable, AccessControlUpgradeable {
   ) internal {
     primarySourceCount[_token] = _sources.length;
     require(
-      _maxPriceDeviation >= MIN_PRICE_DEVIATION && _maxPriceDeviation <= MAX_PRICE_DEVIATION,
+      _maxPriceDeviation >= minPriceDeviation && _maxPriceDeviation <= maxPriceDeviation,
       "CompositeOracle::_setPrimarySources::bad max deviation value"
     );
     require(_sources.length == _oracleDatas.length, "CompositeOracle::_setPrimarySources::inconsistent length");
@@ -107,17 +110,12 @@ contract CompositeOracle is IOracle, Initializable, AccessControlUpgradeable {
       primarySources[_token][_idx] = _sources[_idx];
       oracleDatas[_token][_idx] = _oracleDatas[_idx];
     }
-    emit LogSetPrimarySources(_token, _maxPriceDeviation, _sources);
+    emit LogSetPrimarySources(_token, _maxPriceDeviation, _sources, _oracleDatas);
   }
 
   /// @dev Get the latest exchange rate,
   /// if no valid (recent) rate is available, return false
   function get(bytes calldata _data) external view override returns (bool, uint256) {
-    return (true, _get(_data));
-  }
-
-  /// @dev Check the last exchange rate without any state changes
-  function peek(bytes calldata _data) public view override returns (bool, uint256) {
     return (true, _get(_data));
   }
 
@@ -132,7 +130,7 @@ contract CompositeOracle is IOracle, Initializable, AccessControlUpgradeable {
     // Get valid oracle sources
     uint256 _validSourceCount = 0;
     for (uint256 _idx = 0; _idx < _candidateSourceCount; _idx++) {
-      try primarySources[_token][_idx].peek(oracleDatas[_token][_idx]) returns (
+      try primarySources[_token][_idx].get(oracleDatas[_token][_idx]) returns (
         bool, /*isSuccess*/
         uint256 price
       ) {
@@ -212,11 +210,6 @@ contract CompositeOracle is IOracle, Initializable, AccessControlUpgradeable {
       return _priceBasedOnPriorities[1]; // if 2 valid sources, just validate if one of them are the one having the most priorities, otherwise return the first one
     }
     return _priceBasedOnPriorities[2];
-  }
-
-  /// @dev Check the current spot exchange rate without any state changes
-  function peekSpot(bytes calldata _data) external view override returns (uint256) {
-    return _get(_data);
   }
 
   /// @dev Return the name of available oracles for a given token

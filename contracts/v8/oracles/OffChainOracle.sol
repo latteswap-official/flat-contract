@@ -66,18 +66,6 @@ contract OffChainOracle is IOracle, Initializable, AccessControlUpgradeable {
     return (true, _price);
   }
 
-  /// @dev Check the exchange rate without any state changes
-  function peek(bytes calldata _data) public view override returns (bool, uint256) {
-    (address _token0, address _token1) = abi.decode(_data, (address, address));
-    (uint256 _price, ) = _getPrice(_token0, _token1);
-    return (true, _price);
-  }
-
-  /// @dev Check the current spot exchange rate without any state changes
-  function peekSpot(bytes calldata _data) external view override returns (uint256 _rate) {
-    (, _rate) = peek(_data);
-  }
-
   /// @dev Return "Offchain" as a name
   function name(bytes calldata) public pure override returns (string memory) {
     return "OffChain";

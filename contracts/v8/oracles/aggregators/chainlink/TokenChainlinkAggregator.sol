@@ -10,44 +10,10 @@ pragma solidity 0.8.9;
 
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeCastUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "../interfaces/IChainlinkAggregator.sol";
 
-interface IAggregatorV3Interface {
-  function decimals() external view returns (uint8);
-
-  function description() external view returns (string memory);
-
-  function version() external view returns (uint256);
-
-  // getRoundData and latestRoundData should both raise "No data present"
-  // if they do not have data to report, instead of returning unset values
-  // which could be misinterpreted as actual reported values.
-  function getRoundData(uint80 _roundId)
-    external
-    view
-    returns (
-      uint80 roundId,
-      int256 answer,
-      uint256 startedAt,
-      uint256 updatedAt,
-      uint80 answeredInRound
-    );
-
-  function latestRoundData()
-    external
-    view
-    returns (
-      uint80 roundId,
-      int256 answer,
-      uint256 startedAt,
-      uint256 updatedAt,
-      uint80 answeredInRound
-    );
-}
-
-interface ChainlinkDetailedERC20 {
-  function decimals() external view returns (uint8);
-}
+import "../../../interfaces/IChainlinkAggregator.sol";
+import "../../../interfaces/IAggregatorV3Interface.sol";
+import "../../../interfaces/IChainlinkDetailedERC20.sol";
 
 contract TokenChainlinkAggregator is IChainlinkAggregator, OwnableUpgradeable {
   using SafeCastUpgradeable for int256;
@@ -98,7 +64,7 @@ contract TokenChainlinkAggregator is IChainlinkAggregator, OwnableUpgradeable {
     emit LogSetRefBNBUSD(_refBNBUSD);
   }
 
-  /// @dev Return token price in  representing token value in BNB
+  /// @dev Return token price in  representing token value in USD with 18 decimals
   function latestAnswer() external view override returns (int256) {
     require(maxDelayTime != 0, "TokenChainlinkAggregator::latestAnswer::max delay time not set");
 

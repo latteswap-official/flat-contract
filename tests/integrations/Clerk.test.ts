@@ -9,8 +9,6 @@ import {
   Clerk__factory,
   LatteSwapYieldStrategy,
   MockBoosterForLatteSwapYield,
-  MockEvilFlashLoaner,
-  MockFlashLoaner,
   MockMasterBaristaForLatteSwapYield,
   SimpleToken,
   SimpleToken__factory,

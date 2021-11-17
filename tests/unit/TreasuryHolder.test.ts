@@ -1,24 +1,13 @@
-import { ethers, waffle } from "hardhat";
+import { waffle } from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
 import { treasuryHolderUnitTestFixture } from "../helpers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { Wallet } from "@ethersproject/wallet";
-import {
-  Clerk,
-  Clerk__factory,
-  FLAT,
-  FlatMarket,
-  MockEvilFlashLoaner,
-  MockFlashLoaner,
-  SimpleToken,
-  SimpleToken__factory,
-  TreasuryHolder,
-} from "../../typechain/v8";
-import { BaseContract, BigNumber, constants } from "ethers";
+import { Clerk, FLAT, SimpleToken, TreasuryHolder } from "../../typechain/v8";
+import { BaseContract, constants } from "ethers";
 import { FakeContract, MockContract } from "@defi-wonderland/smock";
 import { MockWBNB } from "@latteswap/latteswap-contract/compiled-typechain";
-import { duration, increaseTimestamp } from "../helpers/time";
 import { MockFlatMarketForTreasuryHolder } from "../../typechain/v8";
 import { parseEther } from "ethers/lib/utils";
 

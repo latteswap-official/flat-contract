@@ -11,8 +11,6 @@ pragma experimental ABIEncoderV2;
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 import "../libraries/LatteConversion.sol";
-import "./IBatchFlashBorrower.sol";
-import "./IFlashBorrower.sol";
 import "./IStrategy.sol";
 
 /// @title Latte Batch Flash Borrower interface

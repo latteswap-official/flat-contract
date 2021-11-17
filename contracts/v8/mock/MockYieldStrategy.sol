@@ -34,13 +34,11 @@ contract MockYieldStrategy is IStrategy {
   }
 
   // Send the assets to the Strategy and call skim to invest them
-  /// @inheritdoc IStrategy
   function deposit(bytes calldata _data) external override {
     return;
   }
 
   // Harvest any profits made converted to the asset and pass them to the caller
-  /// @inheritdoc IStrategy
   function harvest(bytes calldata _data) public override returns (int256 _amountAdded) {
     (uint256 _balance, , , ) = abi.decode(_data, (uint256, address, uint256, uint256));
     _amountAdded = int256(rewardToken.balanceOf(address(this)) - (_balance));
@@ -48,7 +46,6 @@ contract MockYieldStrategy is IStrategy {
   }
 
   // Withdraw assets. The returned amount can differ from the requested amount due to rounding or if the request was more than there is.
-  /// @inheritdoc IStrategy
   function withdraw(bytes calldata _data) external override returns (uint256 _actualAmount) {
     (uint256 _amount, address _sender, , uint256 _stake) = abi.decode(_data, (uint256, address, uint256, uint256));
     rewardToken.safeTransfer(msg.sender, _amount); // Add as profit
@@ -56,7 +53,6 @@ contract MockYieldStrategy is IStrategy {
   }
 
   // Withdraw all assets in the safest way possible. This shouldn't fail.
-  /// @inheritdoc IStrategy
   function exit(uint256 balance) external override returns (int256 _amountAdded) {
     _amountAdded = 0;
     IERC20(rewardToken).safeTransfer(msg.sender, balance);
