@@ -63,7 +63,7 @@ export async function treasuryHolderUnitTestFixture(
   await wbnb.deployed();
 
   const Flat = new FLAT__factory(deployer);
-  const flat = await Flat.deploy(6 * hours, 3000);
+  const flat = (await upgrades.deployProxy(Flat, [6 * hours, 3000])) as FLAT;
   await flat.deployed();
 
   await flat.mint(await deployer.getAddress(), ethers.utils.parseEther("1000000000"));

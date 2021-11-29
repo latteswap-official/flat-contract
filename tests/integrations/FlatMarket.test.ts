@@ -190,7 +190,7 @@ describe("FlatMarket", () => {
 
     // Deploy FLAT
     const FLAT = (await ethers.getContractFactory("FLAT", deployer)) as FLAT__factory;
-    flat = await FLAT.deploy(DAY, MAX_MINT_BPS);
+    flat = (await upgrades.deployProxy(FLAT, [DAY, MAX_MINT_BPS])) as FLAT;
 
     // Deploy MarketConfig
     const FlatMarketConfig = (await ethers.getContractFactory(
@@ -237,6 +237,20 @@ describe("FlatMarket", () => {
 
     // Assuming someone try to borrow FLAT from usdcUsdtLpMarket when it is not setup yet
     await usdcUsdtLp.approve(clerk.address, ethers.constants.MaxUint256);
+    await expect(
+      usdcUsdtLpMarket.depositAndBorrow(
+        deployerAddress,
+        ethers.utils.parseEther("10000000"),
+        ethers.utils.parseEther("8500000"),
+        ethers.utils.parseEther("1"),
+        ethers.utils.parseEther("1")
+      ),
+      "if oracle get stale > 1 day, it will be reverted as no valid source"
+    ).to.be.revertedWith("CompositeOracle::_get::no valid source");
+
+    // Feed offchain price again
+    await offChainOracle.setPrices([usdcUsdtLp.address], [usdt.address], [ethers.utils.parseEther("1")]);
+
     await expect(
       usdcUsdtLpMarket.depositAndBorrow(
         deployerAddress,
@@ -327,6 +341,9 @@ describe("FlatMarket", () => {
         (await timeHelpers.latestTimestamp()).div(timeHelpers.WEEK).add(1).mul(timeHelpers.WEEK)
       );
 
+      // set price to prevent no valid source in case of stale
+      await offChainOracle.setPrices([usdcUsdtLp.address], [usdt.address], [ethers.utils.parseEther("1")]);
+
       // Assuming Alice deposit "collateralAmount" USDC-USDT LP and borrow "borrowAmount" FLAT
       const aliceFlatBefore = await flat.balanceOf(aliceAddress);
       await usdcUsdtLpMarketAsAlice.depositAndBorrow(
@@ -346,6 +363,9 @@ describe("FlatMarket", () => {
         (await timeHelpers.latestTimestamp()).div(timeHelpers.WEEK).add(52).mul(timeHelpers.WEEK)
       );
       stages["oneYearAfter"] = [await timeHelpers.latestTimestamp(), await timeHelpers.latestBlockNumber()];
+
+      // set price to prevent no valid source in case of stale
+      await offChainOracle.setPrices([usdcUsdtLp.address], [usdt.address], [ethers.utils.parseEther("1")]);
 
       // Deposit 0 to accrue interest
       await usdcUsdtLpMarket.deposit(flat.address, deployerAddress, 0);
