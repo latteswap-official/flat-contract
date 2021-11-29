@@ -15,6 +15,7 @@ import {
   MockWBNB,
   MockWBNB__factory,
   FLAT__factory,
+  FLAT,
 } from "../../../typechain/v8";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { smockit, MockContract } from "@eth-optimism/smock";
@@ -56,7 +57,7 @@ export async function flatMarketUnitTestFixture(
 
   // Deploy FLAT
   const FLAT = (await ethers.getContractFactory("FLAT", deployer)) as FLAT__factory;
-  const flat = await FLAT.deploy(24 * 60 * 60, 1500);
+  const flat = (await upgrades.deployProxy(FLAT, [24 * 60 * 60, 1500])) as FLAT;
   await flat.deployed();
   const mockedFlat = await smockit(flat);
 

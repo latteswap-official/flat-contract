@@ -62,8 +62,8 @@ contract OffChainOracle is IOracle, Initializable, AccessControlUpgradeable {
   /// @dev Get the exchange rate
   function get(bytes calldata _data) public view override returns (bool, uint256) {
     (address _token0, address _token1) = abi.decode(_data, (address, address));
-    (uint256 _price, ) = _getPrice(_token0, _token1);
-    return (true, _price);
+    (uint256 _price, uint256 _lastUpdate) = _getPrice(_token0, _token1);
+    return (_lastUpdate >= block.timestamp - 1 days, _price);
   }
 
   /// @dev Return "Offchain" as a name

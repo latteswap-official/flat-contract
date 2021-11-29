@@ -130,12 +130,11 @@ contract CompositeOracle is IOracle, Initializable, AccessControlUpgradeable {
     // Get valid oracle sources
     uint256 _validSourceCount = 0;
     for (uint256 _idx = 0; _idx < _candidateSourceCount; _idx++) {
-      try primarySources[_token][_idx].get(oracleDatas[_token][_idx]) returns (
-        bool, /*isSuccess*/
-        uint256 price
-      ) {
-        _unsortedPrices[_validSourceCount] = price;
-        _prices[_validSourceCount++] = price;
+      try primarySources[_token][_idx].get(oracleDatas[_token][_idx]) returns (bool isSuccess, uint256 price) {
+        if (isSuccess) {
+          _unsortedPrices[_validSourceCount] = price;
+          _prices[_validSourceCount++] = price;
+        }
       } catch {}
     }
     require(_validSourceCount > 0, "CompositeOracle::_get::no valid source");

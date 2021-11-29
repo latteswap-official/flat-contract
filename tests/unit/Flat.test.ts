@@ -35,7 +35,7 @@ describe("FLAT", async () => {
     clerk = (await upgrades.deployProxy(Clerk, [wbnb.address])) as Clerk;
 
     const FLAT = (await ethers.getContractFactory("FLAT")) as FLAT__factory;
-    flat = await FLAT.deploy(MINT_RANGE, MAX_MINT_BPS);
+    flat = (await upgrades.deployProxy(FLAT, [MINT_RANGE, MAX_MINT_BPS])) as FLAT;
 
     flatAsAlice = FLAT__factory.connect(flat.address, alice);
   }
@@ -53,8 +53,10 @@ describe("FLAT", async () => {
     context("when bad init values", async () => {
       it("should revert", async () => {
         const FLAT = (await ethers.getContractFactory("FLAT")) as FLAT__factory;
-        await expect(FLAT.deploy(ethers.constants.Zero, MAX_MINT_BPS)).to.be.revertedWith("bad _initMintRange");
-        await expect(FLAT.deploy(MINT_RANGE, 9000)).to.be.revertedWith("bad _initMaxMintBps");
+        await expect(upgrades.deployProxy(FLAT, [ethers.constants.Zero, MAX_MINT_BPS])).to.be.revertedWith(
+          "bad _initMintRange"
+        );
+        await expect(upgrades.deployProxy(FLAT, [MINT_RANGE, 9000])).to.be.revertedWith("bad _initMaxMintBps");
       });
     });
   });

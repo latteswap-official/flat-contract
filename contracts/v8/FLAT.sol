@@ -8,15 +8,15 @@
 
 pragma solidity 0.8.9;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 import "./interfaces/IClerk.sol";
 
 /// @title FLAT - A stablecoin backed by a basket of farmable assets.
 // solhint-disable not-rely-on-time
-contract FLAT is ERC20("FLAT", "FLAT"), Ownable {
+contract FLAT is ERC20Upgradeable, OwnableUpgradeable {
   /// @dev Event
   event LogReplenish(address indexed market, IClerk indexed vault, uint256 amount);
   event LogSetMaxMintBps(uint256 _prevMaxMintBps, uint256 _newMaxMintBps);
@@ -36,9 +36,12 @@ contract FLAT is ERC20("FLAT", "FLAT"), Ownable {
   /// @notice Contructor to initialize the contract
   /// @param _initMintRange The cool down period between mints
   /// @param _initMaxMintBps The % of FLAT that can be minted
-  constructor(uint256 _initMintRange, uint256 _initMaxMintBps) {
+  function initialize(uint256 _initMintRange, uint256 _initMaxMintBps) external initializer {
     require(_initMintRange >= 6 hours, "bad _initMintRange");
     require(_initMaxMintBps <= 3000, "bad _initMaxMintBps");
+
+    OwnableUpgradeable.__Ownable_init();
+    ERC20Upgradeable.__ERC20_init("FLAT", "FLAT");
 
     mintRange = _initMintRange;
     maxMintBps = _initMaxMintBps;

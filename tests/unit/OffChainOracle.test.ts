@@ -5,6 +5,7 @@ import { solidity } from "ethereum-waffle";
 import { offChainOracleUnitTestFixture } from "../helpers";
 import { OffChainOracle, SimpleToken } from "../../typechain/v8";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { duration, increaseTimestamp } from "../helpers/time";
 
 describe("OffChainOracle", () => {
   // Contract bindings
@@ -98,6 +99,51 @@ describe("OffChainOracle", () => {
           ),
           "since no token1 token1 pair, should revert as a bad price data"
         ).to.revertedWith("OffChainOracle::getPrice:: bad price data");
+      });
+    });
+  });
+
+  describe("#get()", () => {
+    context("when the price is stale", () => {
+      it("should return the price with success = false", async () => {
+        await offChainOracle.grantRole(await offChainOracle.FEEDER_ROLE(), alice.address);
+        await offChainOracle
+          .connect(alice)
+          .setPrices(
+            [simpleTokens[0].address, simpleTokens[1].address],
+            [simpleTokens[1].address, simpleTokens[0].address],
+            [ethers.utils.parseEther("100"), ethers.utils.parseEther("0.01")]
+          );
+        await increaseTimestamp(duration.days(BigNumber.from(1)).add(duration.seconds(BigNumber.from(1))));
+        const [success, price] = await offChainOracle.get(
+          ethers.utils.defaultAbiCoder.encode(
+            ["address", "address"],
+            [simpleTokens[0].address, simpleTokens[1].address]
+          )
+        );
+        expect(success, "expect to get the correct success (should be true)").to.eq(false);
+        expect(price, "expect to get the correct price (should be 100)").to.eq(ethers.utils.parseEther("100"));
+      });
+    });
+
+    context("when the price is not stale", () => {
+      it("should return the price with success = true", async () => {
+        await offChainOracle.grantRole(await offChainOracle.FEEDER_ROLE(), alice.address);
+        await offChainOracle
+          .connect(alice)
+          .setPrices(
+            [simpleTokens[0].address, simpleTokens[1].address],
+            [simpleTokens[1].address, simpleTokens[0].address],
+            [ethers.utils.parseEther("100"), ethers.utils.parseEther("0.01")]
+          );
+        const [success, price] = await offChainOracle.get(
+          ethers.utils.defaultAbiCoder.encode(
+            ["address", "address"],
+            [simpleTokens[0].address, simpleTokens[1].address]
+          )
+        );
+        expect(success, "expect to get the correct success (should be true)").to.eq(true);
+        expect(price, "expect to get the correct price (should be 100)").to.eq(ethers.utils.parseEther("100"));
       });
     });
   });

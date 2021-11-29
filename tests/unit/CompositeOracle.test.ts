@@ -111,20 +111,40 @@ describe("CompositeOracle", () => {
 
     context("when params are correct", () => {
       context("when there is 1 primary source", () => {
-        it("should be return the price", async () => {
-          await compositeOracle.setPrimarySources(
-            simpleToken.address,
-            constants.WeiPerEther,
-            mockOracles.slice(0, 1).map((mockOracle) => mockOracle.address),
-            mockOracles.slice(0, 1).map((_, index) => ethers.utils.defaultAbiCoder.encode(["uint256"], [index]))
-          );
-          const price = ethers.utils.parseEther("10");
-          const encodedToken = ethers.utils.defaultAbiCoder.encode(["address"], [simpleToken.address]);
+        context("if that source is not stale (success = true)", () => {
+          it("should be return the price", async () => {
+            await compositeOracle.setPrimarySources(
+              simpleToken.address,
+              constants.WeiPerEther,
+              mockOracles.slice(0, 1).map((mockOracle) => mockOracle.address),
+              mockOracles.slice(0, 1).map((_, index) => ethers.utils.defaultAbiCoder.encode(["uint256"], [index]))
+            );
+            const price = ethers.utils.parseEther("10");
+            const encodedToken = ethers.utils.defaultAbiCoder.encode(["address"], [simpleToken.address]);
 
-          await mockOracles[0].get.returns([true, price]);
+            await mockOracles[0].get.returns([true, price]);
 
-          const [_, expected] = await compositeOracle.get(encodedToken);
-          expect(expected).to.eq(price);
+            const [_, expected] = await compositeOracle.get(encodedToken);
+            expect(expected).to.eq(price);
+          });
+        });
+
+        context("if that source is stale (success = false)", () => {
+          it("should be return the price", async () => {
+            await compositeOracle.setPrimarySources(
+              simpleToken.address,
+              constants.WeiPerEther,
+              mockOracles.slice(0, 1).map((mockOracle) => mockOracle.address),
+              mockOracles.slice(0, 1).map((_, index) => ethers.utils.defaultAbiCoder.encode(["uint256"], [index]))
+            );
+
+            const price = ethers.utils.parseEther("10");
+            const encodedToken = ethers.utils.defaultAbiCoder.encode(["address"], [simpleToken.address]);
+
+            await mockOracles[0].get.returns([false, price]);
+
+            await expect(compositeOracle.get(encodedToken)).to.revertedWith("CompositeOracle::_get::no valid source");
+          });
         });
       });
       context("when there are 2 primary sources", () => {
