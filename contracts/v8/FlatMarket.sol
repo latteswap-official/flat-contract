@@ -42,6 +42,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   event LogSetInterestPerSec(uint256 oldInterestPerSec, uint256 newInterestPerSec);
   event LogWithdrawSurplus(address indexed feeTo, uint256 surplus);
   event LogWithdrawLiquidationFee(address indexed feeTo, uint256 liquidationFee);
+  event LogSetOracle(IOracle indexed oracle, bytes data);
 
   /// @dev Constants
   uint256 private constant BPS_PRECISION = 1e4;
@@ -135,6 +136,16 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     require(_update, "bad price");
     require(_price >= _minPrice && _price <= _maxPrice, "slippage");
     _;
+  }
+
+  /// @notice Update oracle
+  function setOracle(IOracle _oracle, bytes calldata _data) external onlyOwner {
+    require(address(oracle) != address(0), "oracle cannot be address 0");
+
+    oracle = _oracle;
+    oracleData = _data;
+
+    emit LogSetOracle(oracle, oracleData);
   }
 
   /// @notice Perform actual add collateral

@@ -104,4 +104,13 @@ describe("FlatMarket", () => {
       ).to.be.revertedWith("bad price");
     });
   });
+
+  describe("#setOracle()", async () => {
+    it("should change an oracle as well as oracle data", async () => {
+      await flatMarket.setOracle(await alice.getAddress(), ethers.utils.defaultAbiCoder.encode(["uint256"], [0]));
+
+      expect(await flatMarket.oracle()).to.equal(await alice.getAddress());
+      expect(await flatMarket.oracleData()).to.equal(ethers.utils.defaultAbiCoder.encode(["uint256"], [0]));
+    });
+  });
 });
