@@ -124,6 +124,61 @@
       "address": "0x00ddb6aaDe2E4fECba1Cc4127E02332D667Aac83",
       "txHash": "0x4d029f9c1a87c1c26d0cafbba71c8e1032793b45b39fdb164ab85ad81dde3aee",
       "kind": "transparent"
+    },
+    {
+      "address": "0x5e411dcB9C60088C44c0ea3688dD90D9C0eD44DB",
+      "txHash": "0xf3788f9f10211e92ace4ff68733f48418cbe51327ca771bb6029bb2cc5d68ae3",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x47Cda3F4aCeD67D46334bAde09DeaeB73eb90F6a",
+      "txHash": "0xa6a607091cff88af49a242c3b89d076980f1d3ec64022d32b6bbeaf78159fa88",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x09cF4972912282CE6ceca6150c98a046Cac2e600",
+      "txHash": "0x0dbb77d6293d68f449afe3d96bfc0805a2111952a86eea312c91db3ec5738d3f",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x312147F234478F23148c37A0753474266B2e4B04",
+      "txHash": "0x284fbd261c7a8b910a5a3b9332b297261a5065dace46de204ce3fa1f661c9fcb",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x53120e7Ad5B48fC81d3Cb4158Ae5644c4e084151",
+      "txHash": "0xbbc641ca4da5bfb373cf5556f76d32c6683ae3f24e92fd023933c3e264ca2be1",
+      "kind": "transparent"
+    },
+    {
+      "address": "0xe8cC66bA67d8c6205d27503003e39F883313dB53",
+      "txHash": "0x666a674ca7b47f7ae5ae5e9f1c4e066b60733ec01ea995da787aa40025dcf74f",
+      "kind": "transparent"
+    },
+    {
+      "address": "0xC080C96dF6cf850E4B45B25B17eE63BA5Cc675A8",
+      "txHash": "0x55c73c52423beec5b99f8220d36dfc2bfc94d0ca54b65d06a374195e1f63c60a",
+      "kind": "transparent"
+    },
+    {
+      "address": "0xb8655790f7C39a8A41211d0850c63C2666FabbC0",
+      "txHash": "0x538b1995fabf4eeab3c88aa4a08b3d04a067353a25f21a587d2d6d0faa1af245",
+      "kind": "transparent"
+    },
+    {
+      "address": "0xC530fA549FA407aD289E4C1657C66BC663224cAE",
+      "txHash": "0x35e4c7eb972261c69781a229327efdba538402027b7bf5cfcb5ac2dd88218af8",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x187904dc0868161831839c15b307704E39978861",
+      "txHash": "0xa78c1d4ecf249e729f6bd5997254015b5df3758993c7b18b315638d95874fdc5",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x6e33E2f2361253e4dC449d7ab56fbbFd7352aAFD",
+      "txHash": "0xbe070f7511e302812e2d4016f9a28673e17174694c5614052c950858fd77a60e",
+      "kind": "transparent"
     }
   ],
   "impls": {
@@ -1271,6 +1326,558 @@
           },
           "t_bytes_storage": {
             "label": "bytes"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)738_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)"
+          },
+          "t_bytes32": {
+            "label": "bytes32"
+          },
+          "t_struct(RoleData)738_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "members",
+                "type": "t_mapping(t_address,t_bool)"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32"
+              }
+            ]
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)"
+          },
+          "t_bool": {
+            "label": "bool"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]"
+          }
+        }
+      }
+    },
+    "e28dec9977b15d717f29a05b46e0da13885844777db5e8c14b1e38d8224477f0": {
+      "address": "0x5fb7E7368EDd795061dadD74B773f4a24275Cd39",
+      "txHash": "0xa025daf17cc7bd50d999c60898f79d2e9cf4b2f15320fb77fca1e7518d58b478",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:21"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:26"
+          },
+          {
+            "contract": "ContextUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:30"
+          },
+          {
+            "contract": "OwnableUpgradeable",
+            "label": "_owner",
+            "type": "t_address",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:21"
+          },
+          {
+            "contract": "OwnableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:77"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "_paused",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:28"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:96"
+          },
+          {
+            "contract": "ERC165Upgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol:35"
+          },
+          {
+            "contract": "AccessControlUpgradeable",
+            "label": "_roles",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)738_storage)",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:63"
+          },
+          {
+            "contract": "AccessControlUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:219"
+          },
+          {
+            "contract": "PCSYieldStrategy",
+            "label": "treasuryFeeBps",
+            "type": "t_uint256",
+            "src": "contracts/v8/strategies/yield/PCSYieldStrategy.sol:31"
+          },
+          {
+            "contract": "PCSYieldStrategy",
+            "label": "treasuryAccount",
+            "type": "t_address",
+            "src": "contracts/v8/strategies/yield/PCSYieldStrategy.sol:32"
+          },
+          {
+            "contract": "PCSYieldStrategy",
+            "label": "rewardToken",
+            "type": "t_contract(IERC20Upgradeable)2095",
+            "src": "contracts/v8/strategies/yield/PCSYieldStrategy.sol:35"
+          },
+          {
+            "contract": "PCSYieldStrategy",
+            "label": "masterchef",
+            "type": "t_contract(IPancakeMasterChef)10811",
+            "src": "contracts/v8/strategies/yield/PCSYieldStrategy.sol:36"
+          },
+          {
+            "contract": "PCSYieldStrategy",
+            "label": "stakingToken",
+            "type": "t_contract(IERC20Upgradeable)2095",
+            "src": "contracts/v8/strategies/yield/PCSYieldStrategy.sol:37"
+          },
+          {
+            "contract": "PCSYieldStrategy",
+            "label": "pid",
+            "type": "t_uint256",
+            "src": "contracts/v8/strategies/yield/PCSYieldStrategy.sol:40"
+          },
+          {
+            "contract": "PCSYieldStrategy",
+            "label": "decimals",
+            "type": "t_uint256",
+            "src": "contracts/v8/strategies/yield/PCSYieldStrategy.sol:42"
+          },
+          {
+            "contract": "PCSYieldStrategy",
+            "label": "to18ConversionFactor",
+            "type": "t_uint256",
+            "src": "contracts/v8/strategies/yield/PCSYieldStrategy.sol:42"
+          },
+          {
+            "contract": "PCSYieldStrategy",
+            "label": "accRewardPerShare",
+            "type": "t_uint256",
+            "src": "contracts/v8/strategies/yield/PCSYieldStrategy.sol:45"
+          },
+          {
+            "contract": "PCSYieldStrategy",
+            "label": "accRewardBalance",
+            "type": "t_uint256",
+            "src": "contracts/v8/strategies/yield/PCSYieldStrategy.sol:47"
+          },
+          {
+            "contract": "PCSYieldStrategy",
+            "label": "rewardDebts",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/v8/strategies/yield/PCSYieldStrategy.sol:50"
+          }
+        ],
+        "types": {
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_address": {
+            "label": "address"
+          },
+          "t_contract(IERC20Upgradeable)2095": {
+            "label": "contract IERC20Upgradeable"
+          },
+          "t_contract(IPancakeMasterChef)10811": {
+            "label": "contract IPancakeMasterChef"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)738_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)"
+          },
+          "t_bytes32": {
+            "label": "bytes32"
+          },
+          "t_struct(RoleData)738_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "members",
+                "type": "t_mapping(t_address,t_bool)"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32"
+              }
+            ]
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)"
+          },
+          "t_bool": {
+            "label": "bool"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]"
+          }
+        }
+      }
+    },
+    "5d466df86a1bb1a4c3a4c892d61c85d1dccf7d1e2cbdd568e933b54f1afa8268": {
+      "address": "0xBA6DE2d0be916af65ED5110A960E9F52c3E42BaA",
+      "txHash": "0x0b76816c8fd29aa4f35306121cfc293ea6b5986db5773290329974d5dbf2c898",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:21"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:26"
+          },
+          {
+            "contract": "ContextUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:30"
+          },
+          {
+            "contract": "OwnableUpgradeable",
+            "label": "_owner",
+            "type": "t_address",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:21"
+          },
+          {
+            "contract": "OwnableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:77"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "_paused",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:28"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:96"
+          },
+          {
+            "contract": "ERC165Upgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol:35"
+          },
+          {
+            "contract": "AccessControlUpgradeable",
+            "label": "_roles",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)738_storage)",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:63"
+          },
+          {
+            "contract": "AccessControlUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:219"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "treasuryFeeBps",
+            "type": "t_uint256",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:29"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "treasuryAccount",
+            "type": "t_address",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:30"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "latteBooster",
+            "type": "t_contract(IBooster)10180",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:33"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "rewardToken",
+            "type": "t_contract(IERC20Upgradeable)2095",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:34"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "masterBarista",
+            "type": "t_contract(IMasterBarista)10718",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:35"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "stakingToken",
+            "type": "t_contract(IERC20Upgradeable)2095",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:36"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "decimals",
+            "type": "t_uint256",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:40"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "to18ConversionFactor",
+            "type": "t_uint256",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:40"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "accRewardPerShare",
+            "type": "t_uint256",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:43"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "accRewardBalance",
+            "type": "t_uint256",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:45"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "rewardDebts",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:48"
+          }
+        ],
+        "types": {
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_address": {
+            "label": "address"
+          },
+          "t_contract(IBooster)10180": {
+            "label": "contract IBooster"
+          },
+          "t_contract(IERC20Upgradeable)2095": {
+            "label": "contract IERC20Upgradeable"
+          },
+          "t_contract(IMasterBarista)10718": {
+            "label": "contract IMasterBarista"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)"
+          },
+          "t_mapping(t_bytes32,t_struct(RoleData)738_storage)": {
+            "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)"
+          },
+          "t_bytes32": {
+            "label": "bytes32"
+          },
+          "t_struct(RoleData)738_storage": {
+            "label": "struct AccessControlUpgradeable.RoleData",
+            "members": [
+              {
+                "label": "members",
+                "type": "t_mapping(t_address,t_bool)"
+              },
+              {
+                "label": "adminRole",
+                "type": "t_bytes32"
+              }
+            ]
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)"
+          },
+          "t_bool": {
+            "label": "bool"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]"
+          }
+        }
+      }
+    },
+    "9ff376eda9f3d8c663e373fe4df5893d7aa81eca8340cfc0cc8e5b2229f2a941": {
+      "address": "0x22280129271256B8F1dc74c548dF73117Bd1960A",
+      "txHash": "0x2172a7bc3daf8833f7133e78c20da01286e8a8894537a661d0cd0ae7928b35a3",
+      "layout": {
+        "storage": [
+          {
+            "contract": "Initializable",
+            "label": "_initialized",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:21"
+          },
+          {
+            "contract": "Initializable",
+            "label": "_initializing",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:26"
+          },
+          {
+            "contract": "ContextUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:30"
+          },
+          {
+            "contract": "OwnableUpgradeable",
+            "label": "_owner",
+            "type": "t_address",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:21"
+          },
+          {
+            "contract": "OwnableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:77"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "_paused",
+            "type": "t_bool",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:28"
+          },
+          {
+            "contract": "PausableUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:96"
+          },
+          {
+            "contract": "ERC165Upgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)50_storage",
+            "src": "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol:35"
+          },
+          {
+            "contract": "AccessControlUpgradeable",
+            "label": "_roles",
+            "type": "t_mapping(t_bytes32,t_struct(RoleData)738_storage)",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:63"
+          },
+          {
+            "contract": "AccessControlUpgradeable",
+            "label": "__gap",
+            "type": "t_array(t_uint256)49_storage",
+            "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:219"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "treasuryFeeBps",
+            "type": "t_uint256",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:29"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "treasuryAccount",
+            "type": "t_address",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:30"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "latteBooster",
+            "type": "t_contract(IBooster)10180",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:33"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "rewardToken",
+            "type": "t_contract(IERC20Upgradeable)2095",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:34"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "masterBarista",
+            "type": "t_contract(IMasterBarista)10718",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:35"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "stakingToken",
+            "type": "t_contract(IERC20Upgradeable)2095",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:36"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "decimals",
+            "type": "t_uint256",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:40"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "to18ConversionFactor",
+            "type": "t_uint256",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:40"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "accRewardPerShare",
+            "type": "t_uint256",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:43"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "accRewardBalance",
+            "type": "t_uint256",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:45"
+          },
+          {
+            "contract": "LatteSwapYieldStrategy",
+            "label": "rewardDebts",
+            "type": "t_mapping(t_address,t_uint256)",
+            "src": "contracts/v8/strategies/yield/LatteSwapYieldStrategy.sol:48"
+          }
+        ],
+        "types": {
+          "t_uint256": {
+            "label": "uint256"
+          },
+          "t_address": {
+            "label": "address"
+          },
+          "t_contract(IBooster)10180": {
+            "label": "contract IBooster"
+          },
+          "t_contract(IERC20Upgradeable)2095": {
+            "label": "contract IERC20Upgradeable"
+          },
+          "t_contract(IMasterBarista)10718": {
+            "label": "contract IMasterBarista"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)"
           },
           "t_mapping(t_bytes32,t_struct(RoleData)738_storage)": {
             "label": "mapping(bytes32 => struct AccessControlUpgradeable.RoleData)"

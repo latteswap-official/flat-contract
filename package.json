@@ -22,9 +22,15 @@
     "deploy:mainnet:flatMarketConfig": "hardhat --network mainnet deploy --no-compile --reset --tags DeployFlatMarketConfig",
     "deploy:mainnet:clerk": "hardhat --network mainnet deploy --no-compile --reset --tags DeployClerk",
     "deploy:mainnet:latteswapYieldStrategy": "hardhat --network mainnet deploy --no-compile --reset --tags DeployLatteSwapYieldStrategy",
+    "deploy:mainnet:pcsYieldStrategy": "hardhat --network mainnet deploy --no-compile --reset --tags DeployPCSYieldStrategy",
 
     "script:mainnet:oracle:setCompositeOraclePrimarySources": "hardhat --network mainnet run --no-compile ./scripts/oracles/set_composite_oracle_primary_sources.ts",
     "script:mainnet:oracle:getOraclePrices": "hardhat --network mainnet run --no-compile ./scripts/oracles/get_oracle_prices.ts",
+    "script:mainnet:flatmarket:setOracles": "hardhat --network mainnet run --no-compile ./scripts/flatmarket/set_oracles.ts",
+    "script:mainnet:timelock:upgrade": "hardhat --network mainnet run --no-compile ./scripts/timelock/timelock/timelock_upgrade.ts",
+    "script:mainnet:timelock:execute": "hardhat --network mainnet run --no-compile ./scripts/timelock/timelock_execution.ts",
+    "script:mainnet:proxy:upgrade": "hardhat --network mainnet run --no-compile ./scripts/proxy/upgrade.ts",
+    "script:mainnet:flat:mintAndReplenish": "hardhat --network mainnet run --no-compile ./scripts/flat/mint_and_replenish.ts",
 
     "test:integrations:clerk": "hardhat test --no-compile ./tests/integration/Clerk.test.ts",
     "test:integrations:flatMarket": "hardhat test --no-compile ./tests/integrations/FlatMarket.test.ts",
@@ -50,7 +56,7 @@
   "devDependencies": {
     "@eth-optimism/smock": "^1.1.10",
     "@ethersproject/bignumber": "^5.0.14",
-    "@latteswap/latteswap-contract-config": "^1.6.0-rc.0",
+    "@latteswap/latteswap-contract-config": "^1.6.0-rc.5",
     "@nomiclabs/ethereumjs-vm": "^4.2.2",
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-etherscan": "^2.1.1",

@@ -33,17 +33,17 @@ async function main() {
   const COMPOSITE_ORACLE = "0x00ddb6aaDe2E4fECba1Cc4127E02332D667Aac83";
   const PARAMS: ISetCompositeOraclePrimarySourcesParams = [
     {
-      TOKEN: "0xf180466bBbaD8883360334309f558842e4B6eE59",
+      TOKEN: "0x0eD7e52944161450477ee417DE9Cd3a859b14fD0",
       MAX_DEVIATION: ethers.utils.parseEther("1.5"),
       ORACLE: ["0x241c377eEC3e30F7581515d28C5DF7f308408ff7", "0x8474BE3314EDD429993B4948f3c5059F124139E8"],
       ORACLE_DATA: [
         ethers.utils.defaultAbiCoder.encode(
           ["address", "address", "uint256"],
-          ["0x05E333588fD7A75529Fd223882a053Aa8f9C71ae", constants.AddressZero, ethers.utils.parseUnits("1", 36)]
+          ["0x09cF4972912282CE6ceca6150c98a046Cac2e600", constants.AddressZero, ethers.utils.parseUnits("1", 36)]
         ),
         ethers.utils.defaultAbiCoder.encode(
           ["address", "address"],
-          ["0xf180466bBbaD8883360334309f558842e4B6eE59", constants.AddressZero]
+          ["0x0eD7e52944161450477ee417DE9Cd3a859b14fD0", constants.AddressZero]
         ),
       ],
     },
@@ -83,7 +83,7 @@ async function main() {
   console.log("✅ Done");
 }
 
-withNetworkFile(main)
+main()
   .then(() => process.exit(0))
   .catch((error) => {
     console.error(error);

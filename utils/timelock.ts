@@ -74,13 +74,6 @@ export async function executeTransaction(
   console.log(`>> Execute tx for: ${info}`);
   const config = getConfig();
   const timelock = Timelock__factory.connect(config.Timelock, (await ethers.getSigners())[0]);
-  const estimatedGas = await timelock.estimateGas.executeTransaction(
-    target,
-    value,
-    signature,
-    ethers.utils.defaultAbiCoder.encode(paramTypes, params),
-    eta
-  );
   const executeTx = await timelock.executeTransaction(
     target,
     value,
@@ -88,7 +81,6 @@ export async function executeTransaction(
     ethers.utils.defaultAbiCoder.encode(paramTypes, params),
     eta,
     {
-      gasLimit: estimatedGas.add(2000000),
       gasPrice: ethers.utils.parseUnits("20", "gwei"),
       ...(!!nonce && { nonce: nonce }),
     }

@@ -16,9 +16,9 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
   const deployer = (await ethers.getSigners())[0];
-  const LP = "0xf180466bBbaD8883360334309f558842e4B6eE59";
-  const CHAINLINK_TOKEN0_ORACLE = "0xB97Ad0E74fa7d920791E90258A6E2085088b4320";
-  const CHAINLINK_TOKEN1_ORACLE = "0xcBb98864Ef56E9042e7d2efef76141f15731B82f";
+  const LP = "0x0eD7e52944161450477ee417DE9Cd3a859b14fD0";
+  const CHAINLINK_TOKEN0_ORACLE = "0xB6064eD41d4f67e353768aA239cA86f4F73665a1";
+  const CHAINLINK_TOKEN1_ORACLE = "0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE";
 
   await withNetworkFile(async () => {
     const pair = LatteSwapPair__factory.connect(LP, deployer);

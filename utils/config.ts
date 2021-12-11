@@ -1,6 +1,10 @@
 import ProdConfig from "@latteswap/latteswap-contract-config/prod.json";
 import DevelopConfig from "@latteswap/latteswap-contract-config/develop.json";
 
+export type IDevelopConfig = typeof DevelopConfig;
+
+export type IProdConfig = typeof ProdConfig;
+
 export type IConfig = typeof DevelopConfig | typeof ProdConfig;
 
 export function getConfig(): IConfig {

@@ -11,7 +11,7 @@ import {
   Clerk,
   Clerk__factory,
 } from "../../typechain/v8";
-import { withNetworkFile } from "../../utils";
+import { getConfig, IDevelopConfig, withNetworkFile } from "../../utils";
 import { constants } from "ethers";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
@@ -26,20 +26,21 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   */
   const deployer = (await ethers.getSigners())[0];
   let nonce = await deployer.getTransactionCount();
-  const FLAT_MARKET_CONFIG = "0xC1A51315bE43D84FA7C8b6Dc038799fE1F89ef81";
+  const config = getConfig();
+  const FLAT_MARKET_CONFIG = config.FlatMarketConfig;
   const PARAMS = [
     {
       // market params
-      CLERK: "0x140616edc7A9262788AB5c4D43a013D970de295B",
-      FLAT: "0x0950F9553e02B0d0cCb1Eb76E71B7Abf7E3AB7c2",
-      COLLATERAL_TOKEN: "0xf180466bBbaD8883360334309f558842e4B6eE59",
-      ORACLE: "0x8474BE3314EDD429993B4948f3c5059F124139E8",
+      CLERK: config.Clerk,
+      FLAT: config.FLAT,
+      COLLATERAL_TOKEN: "0x0eD7e52944161450477ee417DE9Cd3a859b14fD0",
+      ORACLE: (config as IDevelopConfig).Oracle["OffChain"],
       ORACLE_DATA: ethers.utils.defaultAbiCoder.encode(
         ["address", "address"],
-        ["0xf180466bBbaD8883360334309f558842e4B6eE59", constants.AddressZero]
+        ["0x0eD7e52944161450477ee417DE9Cd3a859b14fD0", constants.AddressZero]
       ),
       // config params
-      COLLATERAL_FACTOR: "9000",
+      COLLATERAL_FACTOR: "7500",
       LIQUIDATION_PENALTY: "10500",
       LIQUIDATION_TREASURY_BPS: "500",
       MIN_DEBT_SIZE: "1000",
