@@ -66,7 +66,7 @@ contract LatteSwapYieldStrategy is IStrategy, OwnableUpgradeable, PausableUpgrad
     latteBooster = _latteBooster;
     stakingToken = _stakingToken;
     masterBarista = IMasterBarista(IBooster(latteBooster).masterBarista());
-    rewardToken = IERC20Upgradeable(IBooster(latteBooster).latte());
+    rewardToken = IERC20Upgradeable(masterBarista.activeLatte());
     decimals = IToken(address(_stakingToken)).decimals();
     to18ConversionFactor = 10**(18 - decimals);
 
@@ -163,7 +163,11 @@ contract LatteSwapYieldStrategy is IStrategy, OwnableUpgradeable, PausableUpgrad
 
   // Withdraw all assets in the safest way possible. This shouldn't fail.
   function exit(uint256 balance) external override onlyGovernance whenNotPaused returns (int256 _amountAdded) {
-    latteBooster.emergencyWithdraw(address(stakingToken));
+    (uint256 _stakedBalance, , , ) = masterBarista.userInfo(address(stakingToken), address(this));
+
+    if (_stakedBalance > 0) {
+      latteBooster.emergencyWithdraw(address(stakingToken));
+    }
 
     uint256 _stakingBalance = stakingToken.balanceOf(address(this));
 

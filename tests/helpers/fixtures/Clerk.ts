@@ -140,6 +140,7 @@ export async function clerkIntegrationTestFixture(
     deployer
   );
   const masterBarista: MockContract<MockMasterBaristaForLatteSwapYield> = await MasterBarista.deploy();
+  await masterBarista.setActiveLatte(latteToken.address);
 
   // Mint LATTE for testing purpose
   await latteToken.mint(await deployer.getAddress(), ethers.utils.parseEther("888888888"));
