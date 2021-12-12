@@ -1,5 +1,5 @@
 {
-  "name": "@latteswap/latteswap-contract",
+  "name": "@latteswap/latteswap-flat",
   "scripts": {
     "mainnetfork": "source ./start_mainnet_fork_node.sh",
     "copy-dts-typechain": "npx copyfiles -u 1 \"typechain/**/*.d.ts\" compiled-typechain",
@@ -36,7 +36,7 @@
   "devDependencies": {
     "@eth-optimism/smock": "^1.1.10",
     "@ethersproject/bignumber": "^5.0.14",
-    "@latteswap/latteswap-contract-config": "^1.2.0",
+    "@latteswap/latteswap-contract-config": "^1.6.0-rc.7",
     "@nomiclabs/ethereumjs-vm": "^4.2.2",
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-etherscan": "^2.1.1",
@@ -77,7 +77,8 @@
   "files": [
     "typechain",
     "artifacts",
-    "contracts"
+    "contracts",
+    "compiled-typechain"
   ],
   "dependencies": {
     "@defi-wonderland/smock": "^2.0.7",
