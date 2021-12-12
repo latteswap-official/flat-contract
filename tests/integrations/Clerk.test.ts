@@ -804,6 +804,15 @@ describe("Clerk", () => {
             ethers.utils.parseEther("1")
           );
           expect(await stakingToken.balanceOf(booster.address)).to.eq(ethers.utils.parseEther("1"));
+          // MOCK master barista storages so that it can harvest
+          await masterBarista.setVariable("userInfo", {
+            [stakingToken.address]: {
+              [latteSwapPoolStrategy.address]: {
+                amount: ethers.utils.parseEther("1").toString(),
+                fundedBy: booster.address,
+              },
+            },
+          });
           await clerk.setStrategy(stakingToken.address, constants.AddressZero);
           expect(await stakingToken.balanceOf(booster.address)).to.eq(ethers.utils.parseEther("0"));
           expect(await stakingToken.balanceOf(clerk.address)).to.eq(ethers.utils.parseEther("1"));
