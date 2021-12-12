@@ -14,6 +14,11 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "../interfaces/IOracle.sol";
 
 contract CompositeOracle is IOracle, Initializable, AccessControlUpgradeable {
+  struct Price {
+    uint64 lastUpdatedTimestamp;
+    uint256 currentPrice;
+    uint256 nextPrice;
+  }
   // Mapping from token to number of sources
   mapping(address => uint256) public primarySourceCount;
   // Mapping from token to (mapping from index to oracle source)
@@ -22,20 +27,26 @@ contract CompositeOracle is IOracle, Initializable, AccessControlUpgradeable {
   mapping(address => mapping(uint256 => bytes)) public oracleDatas;
   // Mapping from token to max price deviation (multiplied by 1e18)
   mapping(address => uint256) public maxPriceDeviations;
+  // Mapping from token to price
+  mapping(address => Price) public prices;
 
   bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
 
   uint256 public minPriceDeviation;
   uint256 public maxPriceDeviation;
 
+  uint32 public timeDelay; // in seconds
+
   event LogSetPrimarySources(address indexed token, uint256 maxPriceDeviation, IOracle[] oracles, bytes[] oracleDatas);
+  event LogSetTimeDelay(address indexed caller, uint32 newTimeDelay);
+  event LogSetPrice(address indexed token, uint256 currentPrice, uint256 nextPrice, uint64 lastUpdatedTimestamp);
 
   modifier onlyGovernance() {
     require(hasRole(GOVERNANCE_ROLE, _msgSender()), "CompositeOracle::onlyGovernance::only GOVERNANCE role");
     _;
   }
 
-  function initialize() external initializer {
+  function initialize(uint32 _timeDelay) external initializer {
     AccessControlUpgradeable.__AccessControl_init();
 
     _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
@@ -43,6 +54,22 @@ contract CompositeOracle is IOracle, Initializable, AccessControlUpgradeable {
 
     minPriceDeviation = 1e18;
     maxPriceDeviation = 3e18;
+
+    require(
+      _timeDelay >= 15 minutes && _timeDelay <= 2 days,
+      "CompositeOracle::setMultiPrimarySources::invalid time delay"
+    );
+    timeDelay = _timeDelay;
+  }
+
+  /// @dev set time delay for price updates
+  function setTimeDelay(uint32 _newTimeDelay) external onlyGovernance {
+    require(
+      _newTimeDelay >= 15 minutes && _newTimeDelay <= 2 days,
+      "CompositeOracle::setMultiPrimarySources::invalid time delay"
+    );
+    timeDelay = _newTimeDelay;
+    emit LogSetTimeDelay(_msgSender(), _newTimeDelay);
   }
 
   /// @dev Set oracle primary sources for the token
@@ -113,15 +140,46 @@ contract CompositeOracle is IOracle, Initializable, AccessControlUpgradeable {
     emit LogSetPrimarySources(_token, _maxPriceDeviation, _sources, _oracleDatas);
   }
 
+  /// @dev update the current price for the token using the nextPrice as well as using the newly fetched price as a new next price
+  /// @param _datas array of encoded data
+  function setPrices(bytes[] calldata _datas) public {
+    for (uint256 _idx = 0; _idx < _datas.length; _idx++) {
+      address _token = abi.decode(_datas[_idx], (address));
+      Price storage _priceMeta = prices[_token];
+      require(pass(_token), "CompositeOracle::setPrice::has not passed a time delay");
+      uint256 _price = _get(_token);
+
+      // if lastUpdatedTimestamp = 0, it means that the price is not yet updated,
+      // so currentPrice and nextPrice should be the first fetched price
+      _priceMeta.currentPrice = _priceMeta.lastUpdatedTimestamp == 0 ? _price : _priceMeta.nextPrice;
+      _priceMeta.nextPrice = _price;
+      _priceMeta.lastUpdatedTimestamp = getStartOfIntervalTimestamp(block.timestamp);
+
+      emit LogSetPrice(_token, _priceMeta.currentPrice, _priceMeta.nextPrice, _priceMeta.lastUpdatedTimestamp);
+    }
+  }
+
+  /// @dev since timestamp can be any value, we need to mod with timeDelay so that the lastUpdatedTimeStamp match with */time_delay * * * * expression
+  function getStartOfIntervalTimestamp(uint256 ts) internal view returns (uint64) {
+    require(timeDelay != 0, "CompositeOracle::getStartOfIntervalTimestamp::time delay is zero");
+    return uint64(ts - (ts % timeDelay));
+  }
+
+  /// @notice is the current timestamp pass the delay
+  function pass(address _token) public view returns (bool ok) {
+    return block.timestamp >= prices[_token].lastUpdatedTimestamp + timeDelay;
+  }
+
   /// @dev Get the latest exchange rate,
   /// if no valid (recent) rate is available, return false
   function get(bytes calldata _data) external view override returns (bool, uint256) {
-    return (true, _get(_data));
+    Price memory price = prices[abi.decode(_data, (address))];
+    require(price.lastUpdatedTimestamp >= block.timestamp - 1 days, "CompositeOracle::get::price stale");
+    return (true, price.currentPrice);
   }
 
   /// @dev internal function for getting a price
-  function _get(bytes calldata _data) internal view returns (uint256) {
-    address _token = abi.decode(_data, (address));
+  function _get(address _token) internal view returns (uint256) {
     uint256 _candidateSourceCount = primarySourceCount[_token];
     require(_candidateSourceCount > 0, "CompositeOracle::_get::no primary source");
     uint256[] memory _prices = new uint256[](_candidateSourceCount); // the less index, the higher priority

@@ -1,10 +1,18 @@
-import { ethers, waffle } from "hardhat";
+import { ethers, upgrades, waffle } from "hardhat";
 import { BigNumber, constants } from "ethers";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
 import { compositeOracleUnitTestFixture } from "../helpers";
-import { CompositeOracle, LPChainlinkAggregator, MockOracle, SimpleToken } from "../../typechain/v8";
+import {
+  CompositeOracle,
+  CompositeOracle__factory,
+  LPChainlinkAggregator,
+  MockOracle,
+  SimpleToken,
+} from "../../typechain/v8";
 import { FakeContract } from "@defi-wonderland/smock";
+import { duration, increaseTimestamp } from "../helpers/time";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 chai.use(solidity);
 const { expect } = chai;
@@ -14,9 +22,46 @@ describe("CompositeOracle", () => {
   let compositeOracle: CompositeOracle;
   let simpleToken: SimpleToken;
   let mockOracles: Array<FakeContract<MockOracle>>;
+  let deployer: SignerWithAddress;
 
   beforeEach(async () => {
+    [deployer] = await ethers.getSigners();
     ({ compositeOracle, simpleToken, mockOracles } = await waffle.loadFixture(compositeOracleUnitTestFixture));
+  });
+
+  describe("#initialize()", () => {
+    context("invalid time delay", () => {
+      it("should reverted", async () => {
+        const cases = [
+          {
+            timeDelay: 14 * 60, // 14 minutes
+            shouldRevert: true,
+          },
+          {
+            timeDelay: 15 * 60, // 15 minutes
+            shouldRevert: false,
+          },
+          {
+            timeDelay: 24 * 60 * 60 * 2 + 1, // 2 days + 1 second
+            shouldRevert: true,
+          },
+          {
+            timeDelay: 24 * 60 * 60 * 2, // 2 days
+            shouldRevert: false,
+          },
+        ];
+
+        for (const { timeDelay, shouldRevert } of cases) {
+          if (shouldRevert) {
+            await expect(upgrades.deployProxy(new CompositeOracle__factory(deployer), [timeDelay])).to.be.revertedWith(
+              "CompositeOracle::setMultiPrimarySources::invalid time delay"
+            );
+            continue;
+          }
+          await expect(upgrades.deployProxy(new CompositeOracle__factory(deployer), [timeDelay])).to.not.be.reverted;
+        }
+      });
+    });
   });
 
   describe("#setPrimarySources()", () => {
@@ -81,11 +126,11 @@ describe("CompositeOracle", () => {
     });
   });
 
-  describe("#get()", () => {
+  describe("#setPrices()", () => {
     context("when there is no primary sources", () => {
       it("should revert", async () => {
         await expect(
-          compositeOracle.get(ethers.utils.defaultAbiCoder.encode(["address"], [constants.AddressZero])),
+          compositeOracle.setPrices([ethers.utils.defaultAbiCoder.encode(["address"], [constants.AddressZero])]),
           "should revert since no primary sources"
         ).to.be.revertedWith("CompositeOracle::_get::no primary source");
       });
@@ -103,13 +148,69 @@ describe("CompositeOracle", () => {
         await mockOracles[1].get.reverts("something went wrong");
 
         await expect(
-          compositeOracle.get(ethers.utils.defaultAbiCoder.encode(["address"], [simpleToken.address])),
+          compositeOracle.setPrices([ethers.utils.defaultAbiCoder.encode(["address"], [simpleToken.address])]),
           "should revert since no valid source"
         ).to.be.revertedWith("CompositeOracle::_get::no valid source");
       });
     });
 
     context("when params are correct", () => {
+      context("when the time has not passed the delay", () => {
+        it("should revert", async () => {
+          await compositeOracle.setPrimarySources(
+            simpleToken.address,
+            constants.WeiPerEther,
+            mockOracles.slice(0, 1).map((mockOracle) => mockOracle.address),
+            mockOracles.slice(0, 1).map((_, index) => ethers.utils.defaultAbiCoder.encode(["uint256"], [index]))
+          );
+          const price = ethers.utils.parseEther("10");
+          const encodedToken = ethers.utils.defaultAbiCoder.encode(["address"], [simpleToken.address]);
+
+          await mockOracles[0].get.returns([true, price]);
+
+          await compositeOracle.setPrices([encodedToken]);
+          expect((await compositeOracle.prices(simpleToken.address)).nextPrice).to.eq(price);
+
+          await expect(
+            compositeOracle.setPrices([encodedToken]),
+            "should revert since time has not passed the delay"
+          ).to.be.revertedWith("CompositeOracle::setPrice::has not passed a time delay");
+        });
+      });
+      context("when the time has passed the delay", () => {
+        it("should successfully update the price", async () => {
+          await compositeOracle.setPrimarySources(
+            simpleToken.address,
+            constants.WeiPerEther,
+            mockOracles.slice(0, 1).map((mockOracle) => mockOracle.address),
+            mockOracles.slice(0, 1).map((_, index) => ethers.utils.defaultAbiCoder.encode(["uint256"], [index]))
+          );
+          const price1 = ethers.utils.parseEther("10");
+          const encodedToken = ethers.utils.defaultAbiCoder.encode(["address"], [simpleToken.address]);
+
+          await mockOracles[0].get.returns([true, price1]);
+
+          await compositeOracle.setPrices([encodedToken]);
+
+          let [_, actualPrice] = await compositeOracle.get(encodedToken);
+          expect(actualPrice).to.eq(price1);
+          expect((await compositeOracle.prices(simpleToken.address)).currentPrice).to.eq(price1);
+          expect((await compositeOracle.prices(simpleToken.address)).nextPrice).to.eq(price1);
+
+          await increaseTimestamp(duration.minutes(BigNumber.from("15")));
+
+          const price2 = ethers.utils.parseEther("20");
+
+          await mockOracles[0].get.returns([true, price2]);
+
+          await compositeOracle.setPrices([encodedToken]);
+
+          [_, actualPrice] = await compositeOracle.get(encodedToken);
+          expect(actualPrice).to.eq(price1);
+          expect((await compositeOracle.prices(simpleToken.address)).nextPrice).to.eq(price2);
+          expect((await compositeOracle.prices(simpleToken.address)).currentPrice).to.eq(price1);
+        });
+      });
       context("when there is 1 primary source", () => {
         context("if that source is not stale (success = true)", () => {
           it("should be return the price", async () => {
@@ -124,8 +225,8 @@ describe("CompositeOracle", () => {
 
             await mockOracles[0].get.returns([true, price]);
 
-            const [_, expected] = await compositeOracle.get(encodedToken);
-            expect(expected).to.eq(price);
+            await compositeOracle.setPrices([encodedToken]);
+            expect((await compositeOracle.prices(simpleToken.address)).nextPrice).to.eq(price);
           });
         });
 
@@ -143,7 +244,9 @@ describe("CompositeOracle", () => {
 
             await mockOracles[0].get.returns([false, price]);
 
-            await expect(compositeOracle.get(encodedToken)).to.revertedWith("CompositeOracle::_get::no valid source");
+            await expect(compositeOracle.setPrices([encodedToken])).to.revertedWith(
+              "CompositeOracle::_get::no valid source"
+            );
           });
         });
       });
@@ -162,7 +265,7 @@ describe("CompositeOracle", () => {
 
             await mockOracles[1].get.returns([true, ethers.utils.parseEther("100")]); //50% diff with price0
 
-            await expect(compositeOracle.get(encodedToken)).to.revertedWith(
+            await expect(compositeOracle.setPrices([encodedToken])).to.revertedWith(
               "CompositeOracle::_get::too much deviation (2 valid sources)"
             );
           });
@@ -192,8 +295,22 @@ describe("CompositeOracle", () => {
 
             await mockOracles[1].get.returns([true, cases[index].prices[1]]);
 
-            const [_, expected] = await compositeOracle.get(encodedToken);
-            expect(expected, `case: ${index}`).to.eq(cases[index].expectedPrice);
+            await compositeOracle.setPrices([encodedToken]);
+            expect((await compositeOracle.prices(simpleToken.address)).nextPrice, `case ${index}`).to.eq(
+              cases[index].expectedPrice
+            );
+
+            if (parseInt(index) > 0) {
+              expect((await compositeOracle.prices(simpleToken.address)).currentPrice).to.eq(
+                cases[parseInt(index) - 1].expectedPrice
+              );
+            } else {
+              expect((await compositeOracle.prices(simpleToken.address)).currentPrice).to.eq(
+                cases[parseInt(index)].expectedPrice
+              );
+            }
+
+            await increaseTimestamp(duration.minutes(BigNumber.from("15")));
           }
         });
       });
@@ -229,8 +346,22 @@ describe("CompositeOracle", () => {
 
               await mockOracles[2].get.returns([true, cases[index].prices[2]]);
 
-              const [_, expected] = await compositeOracle.get(encodedToken);
-              expect(expected, `case: ${index}`).to.eq(cases[index].expectedPrice);
+              await compositeOracle.setPrices([encodedToken]);
+              expect((await compositeOracle.prices(simpleToken.address)).nextPrice, `case ${index}`).to.eq(
+                cases[index].expectedPrice
+              );
+
+              if (parseInt(index) > 0) {
+                expect((await compositeOracle.prices(simpleToken.address)).currentPrice).to.eq(
+                  cases[parseInt(index) - 1].expectedPrice
+                );
+              } else {
+                expect((await compositeOracle.prices(simpleToken.address)).currentPrice).to.eq(
+                  cases[parseInt(index)].expectedPrice
+                );
+              }
+
+              await increaseTimestamp(duration.minutes(BigNumber.from("15")));
             }
           });
         });
@@ -271,8 +402,22 @@ describe("CompositeOracle", () => {
 
               await mockOracles[2].get.returns([true, cases[index].prices[2]]);
 
-              const [_, expected] = await compositeOracle.get(encodedToken);
-              expect(expected, `case: ${index}`).to.eq(cases[index].expectedPrice);
+              await compositeOracle.setPrices([encodedToken]);
+              expect((await compositeOracle.prices(simpleToken.address)).nextPrice, `case ${index}`).to.eq(
+                cases[index].expectedPrice
+              );
+
+              if (parseInt(index) > 0) {
+                expect((await compositeOracle.prices(simpleToken.address)).currentPrice).to.eq(
+                  cases[parseInt(index) - 1].expectedPrice
+                );
+              } else {
+                expect((await compositeOracle.prices(simpleToken.address)).currentPrice).to.eq(
+                  cases[parseInt(index)].expectedPrice
+                );
+              }
+
+              await increaseTimestamp(duration.minutes(BigNumber.from("15")));
             }
           });
         });
@@ -313,8 +458,22 @@ describe("CompositeOracle", () => {
 
               await mockOracles[2].get.returns([true, cases[index].prices[2]]);
 
-              const [_, expected] = await compositeOracle.get(encodedToken);
-              expect(expected, `case: ${index}`).to.eq(cases[index].expectedPrice);
+              await compositeOracle.setPrices([encodedToken]);
+              expect((await compositeOracle.prices(simpleToken.address)).nextPrice, `case ${index}`).to.eq(
+                cases[index].expectedPrice
+              );
+
+              if (parseInt(index) > 0) {
+                expect((await compositeOracle.prices(simpleToken.address)).currentPrice).to.eq(
+                  cases[parseInt(index) - 1].expectedPrice
+                );
+              } else {
+                expect((await compositeOracle.prices(simpleToken.address)).currentPrice).to.eq(
+                  cases[parseInt(index)].expectedPrice
+                );
+              }
+
+              await increaseTimestamp(duration.minutes(BigNumber.from("15")));
             }
           });
         });
@@ -335,7 +494,7 @@ describe("CompositeOracle", () => {
 
             await mockOracles[2].get.returns([true, ethers.utils.parseEther("1000")]);
 
-            await expect(compositeOracle.get(encodedToken)).to.revertedWith(
+            await expect(compositeOracle.setPrices([encodedToken])).to.revertedWith(
               "CompositeOracle::_get::too much deviation (3 valid sources)"
             );
           });

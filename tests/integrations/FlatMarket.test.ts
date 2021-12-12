@@ -171,13 +171,21 @@ describe("FlatMarket", () => {
     expect(price).to.eq(ethers.utils.parseEther("1"));
 
     const CompositeOracle = (await ethers.getContractFactory("CompositeOracle", deployer)) as CompositeOracle__factory;
-    compositOracle = (await upgrades.deployProxy(CompositeOracle, [])) as CompositeOracle;
+    compositOracle = (await upgrades.deployProxy(CompositeOracle, [15 * 60])) as CompositeOracle;
     await compositOracle.setPrimarySources(
       usdcUsdtLp.address,
       MAX_PRICE_DEVIATION,
       [offChainOracle.address],
       [ethers.utils.defaultAbiCoder.encode(["address", "address"], [usdcUsdtLp.address, usdt.address])]
     );
+
+    await compositOracle.setPrices([ethers.utils.defaultAbiCoder.encode(["address"], [usdcUsdtLp.address])]);
+
+    // skip time to avoid time delay
+    await timeHelpers.increaseTimestamp(timeHelpers.duration.minutes(BigNumber.from("15")));
+
+    // set price once again to let the `nextPrice` of a previous setPrices call move to `currentPrice)
+    await compositOracle.setPrices([ethers.utils.defaultAbiCoder.encode(["address"], [usdcUsdtLp.address])]);
 
     // Expect composit oracle can query from offchain oracle
     [updated, price] = await compositOracle.get(ethers.utils.defaultAbiCoder.encode(["address"], [usdcUsdtLp.address]));
@@ -246,10 +254,12 @@ describe("FlatMarket", () => {
         ethers.utils.parseEther("1")
       ),
       "if oracle get stale > 1 day, it will be reverted as no valid source"
-    ).to.be.revertedWith("CompositeOracle::_get::no valid source");
+    ).to.be.revertedWith("CompositeOracle::get::price stale");
 
     // Feed offchain price again
     await offChainOracle.setPrices([usdcUsdtLp.address], [usdt.address], [ethers.utils.parseEther("1")]);
+    // update composit oracle price after offchain feeding the latest price
+    await compositOracle.setPrices([ethers.utils.defaultAbiCoder.encode(["address"], [usdcUsdtLp.address])]);
 
     await expect(
       usdcUsdtLpMarket.depositAndBorrow(
@@ -343,6 +353,8 @@ describe("FlatMarket", () => {
 
       // set price to prevent no valid source in case of stale
       await offChainOracle.setPrices([usdcUsdtLp.address], [usdt.address], [ethers.utils.parseEther("1")]);
+      await timeHelpers.increaseTimestamp(timeHelpers.duration.minutes(BigNumber.from("15")));
+      await compositOracle.setPrices([ethers.utils.defaultAbiCoder.encode(["address"], [usdcUsdtLp.address])]);
 
       // Assuming Alice deposit "collateralAmount" USDC-USDT LP and borrow "borrowAmount" FLAT
       const aliceFlatBefore = await flat.balanceOf(aliceAddress);
@@ -366,6 +378,8 @@ describe("FlatMarket", () => {
 
       // set price to prevent no valid source in case of stale
       await offChainOracle.setPrices([usdcUsdtLp.address], [usdt.address], [ethers.utils.parseEther("1")]);
+      await timeHelpers.increaseTimestamp(timeHelpers.duration.minutes(BigNumber.from("15")));
+      await compositOracle.setPrices([ethers.utils.defaultAbiCoder.encode(["address"], [usdcUsdtLp.address])]);
 
       // Deposit 0 to accrue interest
       await usdcUsdtLpMarket.deposit(flat.address, deployerAddress, 0);
@@ -766,6 +780,12 @@ describe("FlatMarket", () => {
         // set price to 0.5
         await offChainOracle.setPrices([usdcUsdtLp.address], [usdt.address], [ethers.utils.parseEther("0.5")]);
 
+        // clear the price cache
+        await timeHelpers.increaseTimestamp(timeHelpers.duration.minutes(BigNumber.from("15")));
+        await compositOracle.setPrices([ethers.utils.defaultAbiCoder.encode(["address"], [usdcUsdtLp.address])]);
+        await timeHelpers.increaseTimestamp(timeHelpers.duration.minutes(BigNumber.from("15")));
+        await compositOracle.setPrices([ethers.utils.defaultAbiCoder.encode(["address"], [usdcUsdtLp.address])]);
+
         await expect(
           usdcUsdtLpMarketAsAlice.depositAndBorrow(
             aliceAddress,
@@ -783,6 +803,12 @@ describe("FlatMarket", () => {
         // preparation
         // set price to 1.5
         await offChainOracle.setPrices([usdcUsdtLp.address], [usdt.address], [ethers.utils.parseEther("1.5")]);
+
+        // clear the price cache
+        await timeHelpers.increaseTimestamp(timeHelpers.duration.minutes(BigNumber.from("15")));
+        await compositOracle.setPrices([ethers.utils.defaultAbiCoder.encode(["address"], [usdcUsdtLp.address])]);
+        await timeHelpers.increaseTimestamp(timeHelpers.duration.minutes(BigNumber.from("15")));
+        await compositOracle.setPrices([ethers.utils.defaultAbiCoder.encode(["address"], [usdcUsdtLp.address])]);
 
         await expect(
           usdcUsdtLpMarketAsAlice.depositAndBorrow(
@@ -1662,6 +1688,12 @@ describe("FlatMarket", () => {
           // Set Oracle price to USDC-USDT LP to 0.87 so that Bob position is liquidatable
           await offChainOracle.setPrices([usdcUsdtLp.address], [usdt.address], [collateralPrice]);
 
+          // clear the price cache
+          await timeHelpers.increaseTimestamp(timeHelpers.duration.minutes(BigNumber.from("15")));
+          await compositOracle.setPrices([ethers.utils.defaultAbiCoder.encode(["address"], [usdcUsdtLp.address])]);
+          await timeHelpers.increaseTimestamp(timeHelpers.duration.minutes(BigNumber.from("15")));
+          await compositOracle.setPrices([ethers.utils.defaultAbiCoder.encode(["address"], [usdcUsdtLp.address])]);
+
           // Expect composit oracle can query from offchain oracle
           const [updated, price] = await compositOracle.get(
             ethers.utils.defaultAbiCoder.encode(["address"], [usdcUsdtLp.address])
@@ -1871,6 +1903,12 @@ describe("FlatMarket", () => {
           // Set Oracle price to USDC-USDT LP to 0.75 so that Bob position is bad debt
           await offChainOracle.setPrices([usdcUsdtLp.address], [usdt.address], [collateralPrice]);
 
+          // clear the price cache
+          await timeHelpers.increaseTimestamp(timeHelpers.duration.minutes(BigNumber.from("15")));
+          await compositOracle.setPrices([ethers.utils.defaultAbiCoder.encode(["address"], [usdcUsdtLp.address])]);
+          await timeHelpers.increaseTimestamp(timeHelpers.duration.minutes(BigNumber.from("15")));
+          await compositOracle.setPrices([ethers.utils.defaultAbiCoder.encode(["address"], [usdcUsdtLp.address])]);
+
           // Expect composit oracle can query from offchain oracle
           const [updated, price] = await compositOracle.get(
             ethers.utils.defaultAbiCoder.encode(["address"], [usdcUsdtLp.address])
@@ -1926,13 +1964,17 @@ describe("FlatMarket", () => {
             );
             accruedInterest = accruedInterest.add(interest);
             totalDebtValue = totalDebtValue.add(interest);
-            const bobDebtValBefore = debtHelpers.debtShareToValue(bobDebtShareBefore, totalDebtShare, totalDebtValue);
             // Calculate expected debtShare to be taken from Bob
             const bobTakenDebtValue = bobCollateralAmount
               .mul(collateralPrice)
               .mul(1e4)
               .div(ethers.constants.WeiPerEther.mul(LIQUIDATION_PENALTY));
             const bobTakenDebtShare = debtHelpers.debtValueToShare(bobTakenDebtValue, totalDebtShare, totalDebtValue);
+            const badDebtValue = debtHelpers.debtShareToValue(
+              bobDebtShareBefore.sub(bobTakenDebtShare),
+              totalDebtShare,
+              totalDebtValue
+            );
             const liquidationFee = bobTakenDebtValue
               .mul(LIQUIDATION_PENALTY)
               .div(1e4)
@@ -1942,7 +1984,7 @@ describe("FlatMarket", () => {
             // Calculate totalDebtShare when debt is removed from Bob
             totalDebtShare = totalDebtShare.sub(bobDebtShareBefore);
             // Calculate totalDebtValue after Bob's position is killed
-            totalDebtValue = totalDebtValue.sub(bobDebtValBefore);
+            totalDebtValue = totalDebtValue.sub(bobTakenDebtValue.add(badDebtValue));
             // Expect that totalDebtValue and totalDebtShare must correct
             expect(await usdcUsdtLpMarket.totalDebtShare()).to.be.eq(totalDebtShare);
             expect(await usdcUsdtLpMarket.totalDebtValue()).to.be.eq(totalDebtValue);
@@ -1973,7 +2015,6 @@ describe("FlatMarket", () => {
             expect(await usdcUsdtLpMarket.liquidationFee()).to.be.eq(0);
             expect(await usdcUsdtLpMarket.totalDebtValue()).to.be.eq(totalDebtValue);
             expect(treasuryFlatAfter.sub(treasuryFlatBefore)).to.be.eq(accruedInterest.add(liquidationFee));
-
             expect(await treasuryHolder.totalBadDebtValue()).to.be.eq(userDebtValue);
             expect(await treasuryHolder.badDebtMarkets(usdcUsdtLpMarket.address)).to.be.eq(userDebtValue);
             await expect(treasuryHolder.withdrawSurplus()).to.be.revertedWith(
@@ -2043,10 +2084,14 @@ describe("FlatMarket", () => {
             );
             accruedInterest = accruedInterest.add(interest);
             totalDebtValue = totalDebtValue.add(interest);
-            const bobDebtValBefore = debtHelpers.debtShareToValue(bobDebtShareBefore, totalDebtShare, totalDebtValue);
             // Calculate expected debtShare to be taken from Bob
             const bobActualTakenDebtShare = debtHelpers.debtValueToShare(
               bobTakenDebtValue,
+              totalDebtShare,
+              totalDebtValue
+            );
+            const badDebtValue = debtHelpers.debtShareToValue(
+              bobDebtShareBefore.sub(bobActualTakenDebtShare),
               totalDebtShare,
               totalDebtValue
             );
@@ -2059,7 +2104,8 @@ describe("FlatMarket", () => {
             // Calculate totalDebtShare when debt is removed from Bob
             totalDebtShare = totalDebtShare.sub(bobDebtShareBefore);
             // Calculate totalDebtValue after Bob's position is killed
-            totalDebtValue = totalDebtValue.sub(bobDebtValBefore);
+            totalDebtValue = totalDebtValue.sub(bobTakenDebtValue.add(badDebtValue));
+
             // Expect that totalDebtValue and totalDebtShare must correct
             expect(await usdcUsdtLpMarket.totalDebtShare()).to.be.eq(totalDebtShare);
             expect(await usdcUsdtLpMarket.totalDebtValue()).to.be.eq(totalDebtValue);
