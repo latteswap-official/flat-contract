@@ -3,7 +3,8 @@ import chai from "chai";
 import { solidity } from "ethereum-waffle";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import * as timeHelpers from "../helpers/time";
-import { Clerk, Clerk__factory, FLAT, FLAT__factory, MockWBNB, MockWBNB__factory } from "../../typechain/v8";
+import { Clerk, Clerk__factory, FLAT, FLAT__factory } from "../../typechain/v8";
+import { MockWBNB, MockWBNB__factory } from "../../typechain/v6";
 
 chai.use(solidity);
 const { expect } = chai;
