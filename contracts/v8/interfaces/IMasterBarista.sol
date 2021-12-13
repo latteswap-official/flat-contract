@@ -12,6 +12,8 @@ interface IMasterBarista {
 
   function pendingLatte(address _stakeToken, address _user) external view returns (uint256);
 
+  function activeLatte() external view returns (address);
+
   function userInfo(address _stakeToken, address _user)
     external
     view

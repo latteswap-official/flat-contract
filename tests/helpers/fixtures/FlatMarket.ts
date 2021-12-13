@@ -5,20 +5,18 @@ import {
   Clerk__factory,
   SimpleToken__factory,
   Clerk,
-  CompositeOracle__factory,
-  CompositeOracle,
   SimpleToken,
   FlatMarket,
   FlatMarketConfig,
   FlatMarketConfig__factory,
   FlatMarket__factory,
-  MockWBNB,
-  MockWBNB__factory,
   FLAT__factory,
   FLAT,
+  CompositeOracle__factory,
 } from "../../../typechain/v8";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { smockit, MockContract } from "@eth-optimism/smock";
+import { MockWBNB__factory } from "../../../typechain/v6";
 
 export type IFlatMarketUnitDTO = {
   deployer: SignerWithAddress;
@@ -69,7 +67,7 @@ export async function flatMarketUnitTestFixture(
 
   // Deploy mocked composit oracle
   const CompositeOracle = (await ethers.getContractFactory("CompositeOracle", deployer)) as CompositeOracle__factory;
-  const compositeOracle = await upgrades.deployProxy(CompositeOracle, []);
+  const compositeOracle = await upgrades.deployProxy(CompositeOracle, [15 * 60]);
   await compositeOracle.deployed();
   const mockedCompositeOracle = await smockit(compositeOracle);
 
