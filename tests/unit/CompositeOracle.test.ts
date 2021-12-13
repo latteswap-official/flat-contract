@@ -42,11 +42,11 @@ describe("CompositeOracle", () => {
             shouldRevert: false,
           },
           {
-            timeDelay: 24 * 60 * 60 * 2 + 1, // 2 days + 1 second
+            timeDelay: 60 * 60 + 1, // 1 hour + 1 second
             shouldRevert: true,
           },
           {
-            timeDelay: 24 * 60 * 60 * 2, // 2 days
+            timeDelay: 60 * 60, // 1 hour
             shouldRevert: false,
           },
         ];
