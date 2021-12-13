@@ -56,7 +56,7 @@ contract CompositeOracle is IOracle, Initializable, AccessControlUpgradeable {
     maxPriceDeviation = 3e18;
 
     require(
-      _timeDelay >= 15 minutes && _timeDelay <= 2 days,
+      _timeDelay >= 15 minutes && _timeDelay <= 1 hours,
       "CompositeOracle::setMultiPrimarySources::invalid time delay"
     );
     timeDelay = _timeDelay;
@@ -142,7 +142,7 @@ contract CompositeOracle is IOracle, Initializable, AccessControlUpgradeable {
 
   /// @dev update the current price for the token using the nextPrice as well as using the newly fetched price as a new next price
   /// @param _datas array of encoded data
-  function setPrices(bytes[] calldata _datas) public {
+  function setPrices(bytes[] calldata _datas) external {
     for (uint256 _idx = 0; _idx < _datas.length; _idx++) {
       address _token = abi.decode(_datas[_idx], (address));
       Price storage _priceMeta = prices[_token];
