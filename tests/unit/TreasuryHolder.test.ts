@@ -119,6 +119,21 @@ describe("TreasuryHolder", () => {
     });
   });
 
+  describe("#setTreasuryEOA", () => {
+    context("if treasury EOA is address(0)", () => {
+      it("should revert", async () => {
+        await expect(treasuryHolder.setTreasuryEOA(constants.AddressZero)).to.be.revertedWith(
+          "TreasuryHolder::setTreasuryEOA:: eoa cannot be address(0)"
+        );
+      });
+    });
+
+    it("should be able to change the treasuryEOA", async () => {
+      await treasuryHolder.setTreasuryEOA(carol.address);
+      expect(await treasuryHolder.treasuryEOA()).to.eq(carol.address);
+    });
+  });
+
   describe("#withdrawSurplus()", () => {
     context("if there is a bad debt", () => {
       it("should revert", async () => {
@@ -127,15 +142,6 @@ describe("TreasuryHolder", () => {
 
         await expect(treasuryHolder.withdrawSurplus()).to.be.revertedWith(
           "TreasuryHolder::withdrawSurplus:: there are still bad debt markets"
-        );
-      });
-    });
-
-    context("if treasury EOA is address(0)", () => {
-      it("should revert", async () => {
-        await treasuryHolder.setTreasuryEOA(constants.AddressZero);
-        await expect(treasuryHolder.withdrawSurplus()).to.be.revertedWith(
-          "TreasuryHolder::withdrawSurplus:: treasuryEOA is address(0)"
         );
       });
     });

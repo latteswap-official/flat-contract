@@ -2,17 +2,11 @@ import { ethers, waffle } from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
 import { latteSwapLiquidationStrategyIntegrationTestFixture } from "../helpers";
-import {
-  Clerk,
-  LatteSwapLiquidationStrategy,
-  SimpleToken,
-  LatteSwapFactory,
-  LatteSwapPair,
-  LatteSwapRouter,
-} from "../../typechain/v8";
+import { Clerk, LatteSwapLiquidationStrategy, SimpleToken } from "../../typechain/v8";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BigNumber } from "ethers";
 import { deploy } from "@openzeppelin/hardhat-upgrades/dist/utils";
+import { LatteSwapFactory, LatteSwapPair, LatteSwapRouter } from "../../typechain/v6";
 
 chai.use(solidity);
 const { expect } = chai;

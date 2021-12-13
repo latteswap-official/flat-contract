@@ -85,6 +85,7 @@ contract TreasuryHolder is OwnableUpgradeable, ITreasuryHolderCallback {
   /// @notice set treasuryEOA
   /// @param _treasuryEOA address of the EOA
   function setTreasuryEOA(address _treasuryEOA) external onlyOwner {
+    require(_treasuryEOA != address(0), "TreasuryHolder::setTreasuryEOA:: eoa cannot be address(0)");
     treasuryEOA = _treasuryEOA;
 
     emit LogSetTreasuryEOA(treasuryEOA);
@@ -93,7 +94,6 @@ contract TreasuryHolder is OwnableUpgradeable, ITreasuryHolderCallback {
   /// @notice function to withdraw a surplus + liquidation share to the EOA address
   function withdrawSurplus() external onlyOwner {
     require(totalBadDebtValue == 0, "TreasuryHolder::withdrawSurplus:: there are still bad debt markets");
-    require(treasuryEOA != address(0), "TreasuryHolder::withdrawSurplus:: treasuryEOA is address(0)");
 
     uint256 _balanceOf = clerk.balanceOf(flat, address(this));
 

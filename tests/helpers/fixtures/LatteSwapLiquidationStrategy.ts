@@ -7,17 +7,19 @@ import {
   SimpleToken__factory,
   LatteSwapLiquidationStrategy__factory,
   LatteSwapLiquidationStrategy,
-  LatteSwapPair__factory,
-  LatteSwapPair,
-  MockWBNB__factory,
-  LatteSwapFactory,
-  LatteSwapRouter,
-  LatteSwapFactory__factory,
-  LatteSwapRouter__factory,
 } from "../../../typechain/v8";
 import { BigNumber, constants, Wallet } from "ethers";
 import { MockProvider } from "ethereum-waffle";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { MockWBNB__factory } from "@latteswap/latteswap-contract/compiled-typechain";
+import {
+  LatteSwapFactory,
+  LatteSwapFactory__factory,
+  LatteSwapPair,
+  LatteSwapPair__factory,
+  LatteSwapRouter,
+  LatteSwapRouter__factory,
+} from "../../../typechain/v6";
 
 export interface ILatteSwapLiquidationStrategyDTO {
   latteSwapLiquidationStrategy: LatteSwapLiquidationStrategy;

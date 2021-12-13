@@ -3,6 +3,7 @@ import { BigNumber, Signer, Wallet } from "ethers";
 import { ethers, upgrades } from "hardhat";
 import { CompositeOracle, CompositeOracle__factory, MockOracle, SimpleToken } from "../../../typechain/v8";
 import { FakeContract, MockContract, smock } from "@defi-wonderland/smock";
+import { duration, increaseTimestamp } from "../time";
 
 export interface ICompositeOracleDTO {
   compositeOracle: CompositeOracle;
@@ -17,7 +18,12 @@ export async function compositeOracleUnitTestFixture(
   const [deployer] = await ethers.getSigners();
 
   const CompositeOracle = new CompositeOracle__factory(deployer);
-  const compositeOracle = await upgrades.deployProxy(CompositeOracle, []);
+  const compositeOracle = await upgrades.deployProxy(CompositeOracle, [
+    15 * 60, // 15 minutes
+  ]);
+
+  // reset delay for for each case
+  await increaseTimestamp(duration.minutes(BigNumber.from("15"))); // 7 days
 
   const simpleToken = await (await ethers.getContractFactory("SimpleToken")).deploy();
 

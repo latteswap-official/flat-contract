@@ -20,11 +20,17 @@ contract MockMasterBaristaForLatteSwapYield is IMasterBarista {
     address fundedBy;
   }
 
+  address public override activeLatte;
+
   mapping(address => mapping(address => UserInfo)) public override userInfo;
 
   function poolLength() external view returns (uint256) {}
 
   function pendingLatte(address _stakeToken, address _user) external view returns (uint256) {}
+
+  function setActiveLatte(address _activeLatte) external {
+    activeLatte = _activeLatte;
+  }
 
   function setUserInfo(
     address _token,
