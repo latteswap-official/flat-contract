@@ -27,6 +27,11 @@ async function main() {
   const config = getConfig();
   const PARAMS: ISetOracleParams = [
     {
+      MARKET: (config as IDevelopConfig).FlatMarket["USDT-BUSD"],
+      ORACLE: (config as IDevelopConfig).Oracle["Composite"],
+      ORACLE_DATA: ethers.utils.defaultAbiCoder.encode(["address"], ["0x318B894003D0EAcfEDaA41B8c70ed3CE1Fde1450"]),
+    },
+    {
       MARKET: (config as IDevelopConfig).FlatMarket["PCS_CAKE-WBNB"],
       ORACLE: (config as IDevelopConfig).Oracle["Composite"],
       ORACLE_DATA: ethers.utils.defaultAbiCoder.encode(["address"], ["0x0eD7e52944161450477ee417DE9Cd3a859b14fD0"]),

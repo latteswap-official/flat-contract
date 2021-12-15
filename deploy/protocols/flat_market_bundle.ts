@@ -25,26 +25,23 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
   const deployer = (await ethers.getSigners())[0];
-  let nonce = await deployer.getTransactionCount();
   const config = getConfig();
-  const FLAT_MARKET_CONFIG = config.FlatMarketConfig;
+  const FLAT_MARKET_CONFIG = "0x7466D00b6EB69a62F1B2aDcbD8415367FaCBFBe3";
   const PARAMS = [
     {
       // market params
-      CLERK: config.Clerk,
+      CLERK: "0xBf181131D87B2a7720d2Dd5095f9eCaA456bd735",
       FLAT: config.FLAT,
       COLLATERAL_TOKEN: "0x0eD7e52944161450477ee417DE9Cd3a859b14fD0",
-      ORACLE: (config as IDevelopConfig).Oracle["OffChain"],
-      ORACLE_DATA: ethers.utils.defaultAbiCoder.encode(
-        ["address", "address"],
-        ["0x0eD7e52944161450477ee417DE9Cd3a859b14fD0", constants.AddressZero]
-      ),
+      ORACLE: "0x554F4Ed695D801B2c2cceC0a9927977C264A50fb",
+      ORACLE_DATA: ethers.utils.defaultAbiCoder.encode(["address"], ["0x0eD7e52944161450477ee417DE9Cd3a859b14fD0"]),
       // config params
       COLLATERAL_FACTOR: "7500",
       LIQUIDATION_PENALTY: "10500",
       LIQUIDATION_TREASURY_BPS: "500",
-      MIN_DEBT_SIZE: "1000",
-      INTEREST_PER_SECOND: "317097920",
+      MIN_DEBT_SIZE: ethers.utils.parseEther("5"), // 5 FLAT
+      INTEREST_PER_SECOND: "100000000",
+      CLOSE_FACTOR_BPS: "5000",
     },
   ];
 
@@ -52,6 +49,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     let tx;
     const flatMarketConfig = FlatMarketConfig__factory.connect(FLAT_MARKET_CONFIG, deployer);
     const markets = [];
+    let nonce = await deployer.getTransactionCount();
 
     for (const PARAM of PARAMS) {
       console.log(`>> deploying an FlatMarket`);
@@ -64,13 +62,13 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         PARAM.ORACLE,
         PARAM.ORACLE_DATA,
       ])) as FlatMarket;
-      nonce++;
 
       await flatMarket.deployed();
       console.log(`>> Deployed at ${flatMarket.address}`);
       console.log("✅ Done deploying FlatMarket");
 
       const clerk = Clerk__factory.connect(PARAM.CLERK, deployer);
+      nonce++;
 
       console.log(`>> whitelist market ${flatMarket.address} in CLERK`);
       tx = await clerk.whitelistMarket(flatMarket.address, true, {
@@ -91,6 +89,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         liquidationTreasuryBps: p.LIQUIDATION_TREASURY_BPS,
         minDebtSize: p.MIN_DEBT_SIZE,
         interestPerSecond: p.INTEREST_PER_SECOND,
+        closeFactorBps: p.CLOSE_FACTOR_BPS,
       })),
       { gasPrice: ethers.utils.parseUnits("20", "gwei"), nonce: nonce++ }
     );

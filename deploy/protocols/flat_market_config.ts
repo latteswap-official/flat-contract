@@ -27,7 +27,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const deployer = (await ethers.getSigners())[0];
   const PARAM = {
     TREASURY_ACCOUNT: await deployer.getAddress(),
-    CLERK: "0x140616edc7A9262788AB5c4D43a013D970de295B",
+    CLERK: "0xBf181131D87B2a7720d2Dd5095f9eCaA456bd735",
     FLAT: "0x0950F9553e02B0d0cCb1Eb76E71B7Abf7E3AB7c2",
   };
 

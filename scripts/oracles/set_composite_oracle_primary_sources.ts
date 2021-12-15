@@ -30,7 +30,7 @@ async function main() {
   Check all variables below before execute the deployment script
   */
   const deployer = (await ethers.getSigners())[0];
-  const COMPOSITE_ORACLE = "0x00ddb6aaDe2E4fECba1Cc4127E02332D667Aac83";
+  const COMPOSITE_ORACLE = "0x554F4Ed695D801B2c2cceC0a9927977C264A50fb";
   const PARAMS: ISetCompositeOraclePrimarySourcesParams = [
     {
       TOKEN: "0x0eD7e52944161450477ee417DE9Cd3a859b14fD0",

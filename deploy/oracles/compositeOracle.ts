@@ -15,11 +15,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
   const deployer = (await ethers.getSigners())[0];
+  const TIME_DELAY = 900;
 
   await withNetworkFile(async () => {
     console.log(`deploying an Composite Oracle`);
     const CompositeOracle = (await ethers.getContractFactory("CompositeOracle", deployer)) as CompositeOracle__factory;
-    const compositeOracle = (await upgrades.deployProxy(CompositeOracle, [])) as CompositeOracle;
+    const compositeOracle = (await upgrades.deployProxy(CompositeOracle, [TIME_DELAY])) as CompositeOracle;
 
     await compositeOracle.deployed();
     console.log(`>> Deployed at ${compositeOracle.address}`);
