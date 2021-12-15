@@ -16,10 +16,13 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeCastUpgradeable.sol";
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 
 import "./interfaces/IWBNB.sol";
 import "./interfaces/IStrategy.sol";
 import "./interfaces/IClerk.sol";
+
+import "./interfaces/IFlatMarket.sol";
 
 import "./libraries/LatteConversion.sol";
 
@@ -34,9 +37,13 @@ contract Clerk is IClerk, OwnableUpgradeable {
   using SafeERC20Upgradeable for IERC20Upgradeable;
   using SafeCastUpgradeable for uint256;
   using LatteConversion for Conversion;
+  using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
   /// @notice market to whitelisted state for approval
   mapping(address => bool) public override whitelistedMarkets;
+  /// @notice if the market has been whitelisted it will be set into tokenToMarkets
+  mapping(address => EnumerableSetUpgradeable.AddressSet) private tokenToMarkets;
+
   struct StrategyData {
     uint64 strategyStartDate;
     uint64 targetBps;
@@ -65,13 +72,19 @@ contract Clerk is IClerk, OwnableUpgradeable {
     wbnbToken = IERC20Upgradeable(_wbnbToken);
   }
 
-  /// Modifier to check if the msg.sender is allowed to use funds belonging to the 'from' address.
-  /// If 'from' is msg.sender, it's allowed.
-  /// If 'from' is a whitelisted market, it would be allowed as well.
-  modifier allowed(address _from) {
-    if (_from != msg.sender) {
-      require(whitelistedMarkets[msg.sender], "Clerk::allowed:: invalid market");
+  /// Modifier to check if the msg.sender is allowed to use funds
+  modifier allowed(address _from, IERC20Upgradeable _token) {
+    if (tokenToMarkets[address(_token)].length() == 0) {
+      if (!whitelistedMarkets[msg.sender]) {
+        require(_from == msg.sender, "Clerk::allowed:: msg.sender != from");
+      }
+      _;
+      return;
     }
+    require(
+      tokenToMarkets[address(_token)].contains(msg.sender) && whitelistedMarkets[msg.sender],
+      "Clerk::allowed:: invalid market"
+    );
     _;
   }
 
@@ -142,13 +155,22 @@ contract Clerk is IClerk, OwnableUpgradeable {
   }
 
   /// @notice Enables or disables a contract for approval
-  function whitelistMarket(address market, bool approved) public override onlyOwner {
+  function whitelistMarket(address _market, bool _approved) public override onlyOwner {
     // Checks
-    require(market != address(0), "MasterCMgr::whitelistMarket:: Cannot approve address 0");
+    require(_market != address(0), "MasterCMgr::whitelistMarket:: Cannot approve address 0");
 
     // Effects
-    whitelistedMarkets[market] = approved;
-    emit LogWhiteListMarket(market, approved);
+    whitelistedMarkets[_market] = _approved;
+    address _collateral = address(IFlatMarket(_market).collateral());
+
+    if (_approved) {
+      tokenToMarkets[_collateral].add(_market);
+    } else {
+      tokenToMarkets[_collateral].remove(_market);
+    }
+
+    emit LogTokenToMarkets(_market, _collateral, _approved);
+    emit LogWhiteListMarket(_market, _approved);
   }
 
   /// @notice Deposit an amount of `token` represented in either `amount` or `share`.
@@ -165,7 +187,7 @@ contract Clerk is IClerk, OwnableUpgradeable {
     address _to,
     uint256 _amount,
     uint256 _share
-  ) public payable override allowed(_from) returns (uint256 _amountOut, uint256 _shareOut) {
+  ) public payable override allowed(_from, _token) returns (uint256 _amountOut, uint256 _shareOut) {
     require(address(_token) != address(0), "Clerk::deposit:: token not set");
     require(_to != address(0), "Clerk::deposit:: to not set"); // To avoid a bad UI from burning funds
     // Harvest
@@ -211,7 +233,7 @@ contract Clerk is IClerk, OwnableUpgradeable {
     address _to,
     uint256 _amount,
     uint256 _share
-  ) public override allowed(_from) returns (uint256 _amountOut, uint256 _shareOut) {
+  ) public override allowed(_from, _token) returns (uint256 _amountOut, uint256 _shareOut) {
     require(address(_token) != address(0), "Clerk::withdraw:: token not set");
     require(_to != address(0), "Clerk::withdraw:: to not set"); // To avoid a bad UI from burning funds
 
@@ -254,7 +276,7 @@ contract Clerk is IClerk, OwnableUpgradeable {
     address _from,
     address _to,
     uint256 _share
-  ) public override allowed(_from) {
+  ) public override allowed(_from, _token) {
     require(_to != address(0), "Clerk::transfer:: to not set"); // To avoid a bad UI from burning funds
 
     // Harvest reward (if any) for _from and _to
@@ -279,7 +301,7 @@ contract Clerk is IClerk, OwnableUpgradeable {
     address _from,
     address[] calldata _tos,
     uint256[] calldata _shares
-  ) public override allowed(_from) {
+  ) public override allowed(_from, _token) {
     require(_tos[0] != address(0), "Clerk::transferMultiple:: to[0] not set"); // To avoid a bad UI from burning funds
 
     uint256 _totalAmount;

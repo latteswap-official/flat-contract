@@ -22,4 +22,18 @@ interface IFlatMarket {
   function repay(address _for, uint256 _maxDebtValue) external returns (uint256);
 
   function collateralPrice() external view returns (uint256);
+
+  function collateral() external view returns (IERC20Upgradeable);
+
+  function deposit(
+    IERC20Upgradeable _token,
+    address _to,
+    uint256 _collateralAmount
+  ) external;
+
+  function withdraw(
+    IERC20Upgradeable _token,
+    address _to,
+    uint256 _collateralAmount
+  ) external;
 }
