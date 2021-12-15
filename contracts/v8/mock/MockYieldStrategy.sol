@@ -52,6 +52,12 @@ contract MockYieldStrategy is IStrategy {
     _actualAmount = _amount;
   }
 
+  function update(
+    bytes calldata /*_data*/
+  ) external pure override {
+    return;
+  }
+
   // Withdraw all assets in the safest way possible. This shouldn't fail.
   function exit(uint256 balance) external override returns (int256 _amountAdded) {
     _amountAdded = 0;

@@ -54,6 +54,7 @@ contract PCSYieldStrategy is IStrategy, OwnableUpgradeable, PausableUpgradeable,
   event LogSkim(uint256 amount);
   event LogPause();
   event LogUnpause();
+  event LogUpdate(address indexed user, uint256 indexed newRewardDebt, uint256 indexed prevRewardDebt);
 
   modifier onlyGovernance() {
     require(hasRole(GOVERNANCE_ROLE, _msgSender()), "PCSYieldStrategy::onlyGovernance::only GOVERNANCE role");
@@ -189,6 +190,21 @@ contract PCSYieldStrategy is IStrategy, OwnableUpgradeable, PausableUpgradeable,
   function pause() external onlyGovernance whenNotPaused {
     _pause();
     emit LogPause();
+  }
+
+  // Update is an adhoc function for a special update notified by the caller of this strategy
+  function update(bytes calldata _data) external override onlyGovernance whenNotPaused {
+    (address _from, address _to, uint256 _newFromStake, uint256 _newToStake) = abi.decode(
+      _data,
+      (address, address, uint256, uint256)
+    );
+    uint256 _fromRewardDebts = rewardDebts[_from];
+    uint256 _toRewardDebts = rewardDebts[_to];
+    rewardDebts[_from] = _newFromStake.rmulup(accRewardPerShare);
+    rewardDebts[_to] = _newToStake.rmulup(accRewardPerShare);
+
+    emit LogUpdate(_from, rewardDebts[_from], _fromRewardDebts);
+    emit LogUpdate(_to, rewardDebts[_to], _toRewardDebts);
   }
 
   /**

@@ -52,6 +52,7 @@ contract LatteSwapYieldStrategy is IStrategy, OwnableUpgradeable, PausableUpgrad
   event LogSkim(uint256 amount);
   event LogPause();
   event LogUnpause();
+  event LogUpdate(address indexed user, uint256 indexed newRewardDebt, uint256 indexed prevRewardDebt);
 
   modifier onlyGovernance() {
     require(hasRole(GOVERNANCE_ROLE, _msgSender()), "LatteSwapYieldStrategy::onlyGovernance::only GOVERNANCE role");
@@ -174,6 +175,21 @@ contract LatteSwapYieldStrategy is IStrategy, OwnableUpgradeable, PausableUpgrad
     stakingToken.safeTransfer(_msgSender(), _stakingBalance);
 
     return int256(_stakingBalance - balance);
+  }
+
+  // Update is an adhoc function for a special update notified by the caller of this strategy
+  function update(bytes calldata _data) external override onlyGovernance whenNotPaused {
+    (address _from, address _to, uint256 _fromNewStake, uint256 _toNewStake) = abi.decode(
+      _data,
+      (address, address, uint256, uint256)
+    );
+    uint256 _fromRewardDebts = rewardDebts[_from];
+    uint256 _toRewardDebts = rewardDebts[_to];
+    rewardDebts[_from] = _fromNewStake.rmulup(accRewardPerShare);
+    rewardDebts[_to] = _toNewStake.rmulup(accRewardPerShare);
+
+    emit LogUpdate(_from, rewardDebts[_from], _fromRewardDebts);
+    emit LogUpdate(_to, rewardDebts[_to], _toRewardDebts);
   }
 
   /**
