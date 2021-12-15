@@ -12,6 +12,8 @@ import "@latteswap/latteswap-contract/contracts/swap/interfaces/ILatteSwapRouter
 import "../../interfaces/IFlashLiquidateStrategy.sol";
 import "../../interfaces/IClerk.sol";
 
+import "../../interfaces/IFlatMarket.sol";
+
 contract LatteSwapLiquidationStrategy is IFlashLiquidateStrategy, OwnableUpgradeable {
   using SafeERC20Upgradeable for IERC20Upgradeable;
   // Local variables
@@ -44,15 +46,16 @@ contract LatteSwapLiquidationStrategy is IFlashLiquidateStrategy, OwnableUpgrade
   // Swaps to a flexible amount, from an exact input amount
   function execute(
     IERC20Upgradeable _fromToken,
-    IERC20Upgradeable _toToken,
+    IERC20Upgradeable _flat,
     address _recipient,
     uint256 _minShareTo,
     uint256 _shareFrom
   ) public override {
     address _token0 = ILatteSwapPair(address(_fromToken)).token0();
     address _token1 = ILatteSwapPair(address(_fromToken)).token1();
+    uint256 _amountFrom = clerk.toAmount(_flat, _shareFrom, false);
+    IFlatMarket(msg.sender).withdraw(_fromToken, address(this), _amountFrom);
 
-    (uint256 _amountFrom, ) = clerk.withdraw(_fromToken, address(this), address(this), 0, _shareFrom);
     _fromToken.safeApprove(address(router), _amountFrom);
     // remove liquireity from _amountfrom since _fromToken is an LP
     router.removeLiquidity(_token0, _token1, _amountFrom, 0, 0, address(this), block.timestamp);
@@ -64,12 +67,12 @@ contract LatteSwapLiquidationStrategy is IFlashLiquidateStrategy, OwnableUpgrade
     // swap token1
     IERC20Upgradeable(_token1).safeApprove(address(router), _balanceToken1);
     router.swapExactTokensForTokens(_balanceToken1, 0, pathToFlat[_token1], address(this), block.timestamp);
-    uint256 _flatBalance = _toToken.balanceOf(address(this));
+    uint256 _flatBalance = _flat.balanceOf(address(this));
     require(
-      clerk.toAmount(_toToken, _minShareTo, false) <= _flatBalance,
+      clerk.toAmount(_flat, _minShareTo, false) <= _flatBalance,
       "LatteSwapLiquidationStrategy::execute:: not enough FLAT"
     );
-    _toToken.approve(address(clerk), _flatBalance);
-    clerk.deposit(_toToken, address(this), _recipient, _flatBalance, 0);
+    _flat.approve(address(clerk), _flatBalance);
+    clerk.deposit(_flat, address(this), _recipient, _flatBalance, 0);
   }
 }
