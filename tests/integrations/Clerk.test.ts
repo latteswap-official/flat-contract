@@ -80,9 +80,7 @@ describe("Clerk", () => {
               ethers.utils.parseEther("1"),
               ethers.utils.parseEther("1")
             );
-          expect(await clerkAsAlice.balanceOf(stakingToken.address, alice.address)).to.be.equal(
-            ethers.utils.parseEther("1")
-          );
+          expect(await clerk.balanceOf(stakingToken.address, alice.address)).to.be.equal(ethers.utils.parseEther("1"));
           // MOCK master barista storages so that it can harvest
           await masterBarista.setVariable("userInfo", {
             [stakingToken.address]: {
@@ -110,9 +108,7 @@ describe("Clerk", () => {
               ethers.utils.parseEther("2"),
               ethers.utils.parseEther("2")
             );
-          expect(await clerkAsAlice.balanceOf(stakingToken.address, alice.address)).to.be.equal(
-            ethers.utils.parseEther("3")
-          );
+          expect(await clerk.balanceOf(stakingToken.address, alice.address)).to.be.equal(ethers.utils.parseEther("3"));
           expect(await latteToken.balanceOf(alice.address), "alice should get her harvested rewards").to.be.equal(
             ethers.utils.parseEther("168")
           );
@@ -168,12 +164,10 @@ describe("Clerk", () => {
                 ethers.utils.parseEther("1"),
                 ethers.utils.parseEther("1")
               );
-            expect(await clerkAsAlice.balanceOf(stakingToken.address, alice.address)).to.be.equal(
+            expect(await clerk.balanceOf(stakingToken.address, alice.address)).to.be.equal(
               ethers.utils.parseEther("1")
             );
-            expect(await clerkAsAlice.balanceOf(stakingToken.address, bob.address)).to.be.equal(
-              ethers.utils.parseEther("1")
-            );
+            expect(await clerk.balanceOf(stakingToken.address, bob.address)).to.be.equal(ethers.utils.parseEther("1"));
 
             // MOCK master barista storages so that it can harvest
             await masterBarista.setVariable("userInfo", {
@@ -203,7 +197,7 @@ describe("Clerk", () => {
                 ethers.utils.parseEther("1"),
                 ethers.utils.parseEther("1")
               );
-            expect(await clerkAsAlice.balanceOf(stakingToken.address, bob.address)).to.be.equal(
+            expect(await clerk.connect(alice).balanceOf(stakingToken.address, bob.address)).to.be.equal(
               ethers.utils.parseEther("1")
             );
             expect(await clerk.connect(alice).balanceOf(stakingToken.address, alice.address)).to.be.equal(
@@ -254,12 +248,8 @@ describe("Clerk", () => {
               ethers.utils.parseEther("1"),
               ethers.utils.parseEther("1")
             );
-          expect(await clerkAsAlice.balanceOf(stakingToken.address, alice.address)).to.be.equal(
-            ethers.utils.parseEther("1")
-          );
-          expect(await clerkAsAlice.balanceOf(stakingToken.address, bob.address)).to.be.equal(
-            ethers.utils.parseEther("1")
-          );
+          expect(await clerk.balanceOf(stakingToken.address, alice.address)).to.be.equal(ethers.utils.parseEther("1"));
+          expect(await clerk.balanceOf(stakingToken.address, bob.address)).to.be.equal(ethers.utils.parseEther("1"));
           // MOCK master barista storages so that it can harvest
           await masterBarista.setVariable("userInfo", {
             [stakingToken.address]: {
@@ -286,12 +276,8 @@ describe("Clerk", () => {
               ethers.utils.parseEther("1"),
               ethers.utils.parseEther("1")
             );
-          expect(await clerkAsAlice.balanceOf(stakingToken.address, alice.address)).to.be.equal(
-            ethers.utils.parseEther("1")
-          );
-          expect(await clerk.connect(bob).balanceOf(stakingToken.address, bob.address)).to.be.equal(
-            ethers.utils.parseEther("2")
-          );
+          expect(await clerk.balanceOf(stakingToken.address, alice.address)).to.be.equal(ethers.utils.parseEther("1"));
+          expect(await clerk.balanceOf(stakingToken.address, bob.address)).to.be.equal(ethers.utils.parseEther("2"));
           expect(await latteToken.balanceOf(bob.address), "bob should get his harvested rewards").to.be.equal(
             ethers.utils.parseEther("84")
           );
@@ -407,9 +393,7 @@ describe("Clerk", () => {
               ethers.utils.parseEther("1"),
               ethers.utils.parseEther("1")
             );
-          expect(await clerkAsAlice.balanceOf(stakingToken.address, alice.address)).to.be.equal(
-            ethers.utils.parseEther("1")
-          );
+          expect(await clerk.balanceOf(stakingToken.address, alice.address)).to.be.equal(ethers.utils.parseEther("1"));
           // MOCK master barista storages so that it can harvest
           await masterBarista.setVariable("userInfo", {
             [stakingToken.address]: {
@@ -436,9 +420,7 @@ describe("Clerk", () => {
               ethers.utils.parseEther("1"),
               ethers.utils.parseEther("1")
             );
-          expect(await clerkAsAlice.balanceOf(stakingToken.address, alice.address)).to.be.equal(
-            ethers.utils.parseEther("0")
-          );
+          expect(await clerk.balanceOf(stakingToken.address, alice.address)).to.be.equal(ethers.utils.parseEther("0"));
           expect(await latteToken.balanceOf(alice.address), "alice should get her harvested rewards").to.be.equal(
             ethers.utils.parseEther("168")
           );
@@ -494,12 +476,10 @@ describe("Clerk", () => {
                 ethers.utils.parseEther("1"),
                 ethers.utils.parseEther("1")
               );
-            expect(await clerkAsAlice.balanceOf(stakingToken.address, alice.address)).to.be.equal(
+            expect(await clerk.balanceOf(stakingToken.address, alice.address)).to.be.equal(
               ethers.utils.parseEther("1")
             );
-            expect(await clerkAsAlice.balanceOf(stakingToken.address, bob.address)).to.be.equal(
-              ethers.utils.parseEther("1")
-            );
+            expect(await clerk.balanceOf(stakingToken.address, bob.address)).to.be.equal(ethers.utils.parseEther("1"));
 
             // MOCK master barista storages so that it can harvest
             await masterBarista.setVariable("userInfo", {
@@ -529,12 +509,10 @@ describe("Clerk", () => {
                 ethers.utils.parseEther("1"),
                 ethers.utils.parseEther("1")
               );
-            expect(await clerkAsAlice.balanceOf(stakingToken.address, alice.address)).to.be.equal(
+            expect(await clerk.balanceOf(stakingToken.address, alice.address)).to.be.equal(
               ethers.utils.parseEther("0")
             );
-            expect(await clerk.connect(bob).balanceOf(stakingToken.address, bob.address)).to.be.equal(
-              ethers.utils.parseEther("1")
-            );
+            expect(await clerk.balanceOf(stakingToken.address, bob.address)).to.be.equal(ethers.utils.parseEther("1"));
             expect(await latteToken.balanceOf(alice.address), "alice should get her harvested rewards").to.be.equal(
               ethers.utils.parseEther("84")
             );
@@ -563,12 +541,10 @@ describe("Clerk", () => {
                 ethers.utils.parseEther("1")
               );
 
-            expect(await clerkAsAlice.balanceOf(stakingToken.address, alice.address)).to.be.equal(
+            expect(await clerk.balanceOf(stakingToken.address, alice.address)).to.be.equal(
               ethers.utils.parseEther("0")
             );
-            expect(await clerk.connect(bob).balanceOf(stakingToken.address, bob.address)).to.be.equal(
-              ethers.utils.parseEther("0")
-            );
+            expect(await clerk.balanceOf(stakingToken.address, bob.address)).to.be.equal(ethers.utils.parseEther("0"));
             expect(await latteToken.balanceOf(bob.address), "bob should get his harvested rewards").to.be.equal(
               ethers.utils.parseEther("84")
             );
@@ -622,12 +598,10 @@ describe("Clerk", () => {
               );
 
             await clerk.setStrategy(stakingToken.address, latteSwapPoolStrategy.address);
-            expect(await clerkAsAlice.balanceOf(stakingToken.address, alice.address)).to.be.equal(
+            expect(await clerk.balanceOf(stakingToken.address, alice.address)).to.be.equal(
               ethers.utils.parseEther("1")
             );
-            expect(await clerkAsAlice.balanceOf(stakingToken.address, bob.address)).to.be.equal(
-              ethers.utils.parseEther("1")
-            );
+            expect(await clerk.balanceOf(stakingToken.address, bob.address)).to.be.equal(ethers.utils.parseEther("1"));
 
             // MOCK master barista storages so that it can harvest
             await masterBarista.setVariable("userInfo", {
@@ -654,12 +628,10 @@ describe("Clerk", () => {
                 ethers.utils.parseEther("1"),
                 ethers.utils.parseEther("1")
               );
-            expect(await clerkAsAlice.balanceOf(stakingToken.address, alice.address)).to.be.equal(
+            expect(await clerk.balanceOf(stakingToken.address, alice.address)).to.be.equal(
               ethers.utils.parseEther("0")
             );
-            expect(await clerk.connect(bob).balanceOf(stakingToken.address, bob.address)).to.be.equal(
-              ethers.utils.parseEther("1")
-            );
+            expect(await clerk.balanceOf(stakingToken.address, bob.address)).to.be.equal(ethers.utils.parseEther("1"));
             expect(
               await stakingToken.balanceOf(booster.address),
               "mock booster should now contain a staking token"
@@ -685,12 +657,10 @@ describe("Clerk", () => {
                 ethers.utils.parseEther("1")
               );
 
-            expect(await clerkAsAlice.balanceOf(stakingToken.address, alice.address)).to.be.equal(
+            expect(await clerk.balanceOf(stakingToken.address, alice.address)).to.be.equal(
               ethers.utils.parseEther("0")
             );
-            expect(await clerk.connect(bob).balanceOf(stakingToken.address, bob.address)).to.be.equal(
-              ethers.utils.parseEther("0")
-            );
+            expect(await clerk.balanceOf(stakingToken.address, bob.address)).to.be.equal(ethers.utils.parseEther("0"));
             expect(
               await stakingToken.balanceOf(booster.address),
               "mock booster should now contain a staking token"
@@ -733,12 +703,8 @@ describe("Clerk", () => {
               ethers.utils.parseEther("1"),
               ethers.utils.parseEther("1")
             );
-          expect(await clerkAsAlice.balanceOf(stakingToken.address, alice.address)).to.be.equal(
-            ethers.utils.parseEther("1")
-          );
-          expect(await clerkAsAlice.balanceOf(stakingToken.address, bob.address)).to.be.equal(
-            ethers.utils.parseEther("1")
-          );
+          expect(await clerk.balanceOf(stakingToken.address, alice.address)).to.be.equal(ethers.utils.parseEther("1"));
+          expect(await clerk.balanceOf(stakingToken.address, bob.address)).to.be.equal(ethers.utils.parseEther("1"));
           // MOCK master barista storages so that it can harvest
           await masterBarista.setVariable("userInfo", {
             [stakingToken.address]: {
@@ -800,9 +766,7 @@ describe("Clerk", () => {
               ethers.utils.parseEther("1"),
               ethers.utils.parseEther("1")
             );
-          expect(await clerkAsAlice.balanceOf(stakingToken.address, alice.address)).to.be.equal(
-            ethers.utils.parseEther("1")
-          );
+          expect(await clerk.balanceOf(stakingToken.address, alice.address)).to.be.equal(ethers.utils.parseEther("1"));
           expect(await stakingToken.balanceOf(booster.address)).to.eq(ethers.utils.parseEther("1"));
           // MOCK master barista storages so that it can harvest
           await masterBarista.setVariable("userInfo", {
@@ -817,6 +781,79 @@ describe("Clerk", () => {
           expect(await stakingToken.balanceOf(booster.address)).to.eq(ethers.utils.parseEther("0"));
           expect(await stakingToken.balanceOf(clerk.address)).to.eq(ethers.utils.parseEther("1"));
           expect(await clerk.strategy(stakingToken.address)).to.eq(constants.AddressZero);
+        });
+      });
+    });
+
+    describe("#transfer()", () => {
+      context("when transfer", () => {
+        context("with existing reward debt", () => {
+          it("should update reward debt accordingly", async () => {
+            await stakingToken.connect(alice).approve(clerk.address, ethers.utils.parseEther("1"));
+            await stakingToken.connect(bob).approve(clerk.address, ethers.utils.parseEther("1"));
+            await stakingToken.mint(bob.address, ethers.utils.parseEther("1"));
+
+            await expect(
+              clerk
+                .connect(bob)
+                .deposit(stakingToken.address, bob.address, bob.address, ethers.utils.parseEther("1"), 0)
+            )
+              .to.emit(stakingToken, "Transfer")
+              .withArgs(bob.address, clerk.address, ethers.utils.parseEther("1"))
+              .to.emit(clerk, "LogDeposit")
+              .withArgs(
+                stakingToken.address,
+                bob.address,
+                bob.address,
+                ethers.utils.parseEther("1"),
+                ethers.utils.parseEther("1")
+              );
+            expect(await clerk.balanceOf(stakingToken.address, bob.address)).to.be.equal(ethers.utils.parseEther("1"));
+
+            // MOCK master barista storages so that it can harvest
+            await masterBarista.setVariable("userInfo", {
+              [stakingToken.address]: {
+                [latteSwapPoolStrategy.address]: {
+                  amount: ethers.utils.parseEther("1").toString(),
+                  fundedBy: booster.address,
+                },
+              },
+            });
+            // mock pending rewards
+            await (booster as unknown as MockBoosterForLatteSwapYield).setStakeRewardReturned(
+              ethers.utils.parseEther("168")
+            );
+            await clerk
+              .connect(bob)
+              .transfer(stakingToken.address, bob.address, alice.address, ethers.utils.parseEther("1"));
+            expect(await clerk.balanceOf(stakingToken.address, bob.address)).to.be.equal(ethers.utils.parseEther("0"));
+            expect(await clerk.balanceOf(stakingToken.address, alice.address)).to.be.equal(
+              ethers.utils.parseEther("1")
+            );
+            expect(
+              await latteToken.balanceOf(bob.address),
+              "bob should get his harvested rewards before transferring to alice"
+            ).to.be.equal(ethers.utils.parseEther("168"));
+            expect(await latteToken.balanceOf(alice.address), "alice should not get any reward").to.be.equal(
+              ethers.utils.parseEther("0")
+            );
+            expect(await latteSwapPoolStrategy.rewardDebts(alice.address)).to.eq(ethers.utils.parseEther("168"));
+            expect(await latteSwapPoolStrategy.rewardDebts(bob.address)).to.eq(ethers.utils.parseEther("0"));
+            await clerk
+              .connect(alice)
+              .transfer(stakingToken.address, alice.address, bob.address, ethers.utils.parseEther("1"));
+
+            expect(await clerk.balanceOf(stakingToken.address, bob.address)).to.be.equal(ethers.utils.parseEther("1"));
+            expect(await clerk.balanceOf(stakingToken.address, alice.address)).to.be.equal(
+              ethers.utils.parseEther("0")
+            );
+            expect(await latteSwapPoolStrategy.rewardDebts(alice.address), "reward debt should be recalculated").to.eq(
+              ethers.utils.parseEther("0")
+            );
+            expect(await latteSwapPoolStrategy.rewardDebts(bob.address), "reward debt should be recalculated").to.eq(
+              ethers.utils.parseEther("168")
+            );
+          });
         });
       });
     });
