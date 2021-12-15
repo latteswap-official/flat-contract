@@ -264,6 +264,8 @@ contract Clerk is IClerk, OwnableUpgradeable {
     balanceOf[_token][_from] = balanceOf[_token][_from] - _share;
     balanceOf[_token][_to] = balanceOf[_token][_to] + _share;
 
+    _internalTransferUpdate(_token, _from, _to, balanceOf[_token][_from], balanceOf[_token][_to]);
+
     emit LogTransfer(_token, _from, _to, _share);
   }
 
@@ -374,6 +376,20 @@ contract Clerk is IClerk, OwnableUpgradeable {
     }
 
     strategyData[_token] = _data;
+  }
+
+  /// @dev when transfer occurs, call the strategy to notify the update, in case that the yield strategy requires an update during a balance change
+  function _internalTransferUpdate(
+    IERC20Upgradeable _token,
+    address _from,
+    address _to,
+    uint256 _fromNewBalance,
+    uint256 _toNewBalance
+  ) internal {
+    IStrategy _strategy = strategy[_token];
+
+    if (address(_strategy) == address(0)) return;
+    _strategy.update(abi.encode(_from, _to, _fromNewBalance, _toNewBalance));
   }
 
   /// @dev function to either invest or withdraw from a strategy depending on a different of targetBalance and strategy balance
