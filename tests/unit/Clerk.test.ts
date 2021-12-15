@@ -275,13 +275,14 @@ describe("Clerk", () => {
       });
       context("when msg sender != _From", () => {
         it("Mutates balanceOf correctly by deducting value from _from", async function () {
+          let balBefore, balAfter;
           await clerk.whitelistMarket(flatMarkets[0].address, true);
           await clerk.whitelistMarket(flatMarkets[1].address, true);
 
-          await stakingTokens[0].connect(alice).approve(clerkAsAlice.address, 1000);
-          await stakingTokens[1].connect(alice).approve(clerkAsAlice.address, 1000);
+          await stakingTokens[0].connect(alice).approve(clerkAsAlice.address, 2000);
+          await stakingTokens[1].connect(alice).approve(clerkAsAlice.address, 2000);
 
-          const balBefore = await stakingTokens[0].balanceOf(alice.address);
+          balBefore = await stakingTokens[0].balanceOf(alice.address);
           await expect(
             clerk.connect(alice).deposit(stakingTokens[0].address, alice.address, alice.address, 1, 0)
           ).to.revertedWith("Clerk::allowed:: invalid market");
@@ -305,8 +306,18 @@ describe("Clerk", () => {
             "can not deposit a token having other market registered (stakingToken 1 has flat market 1 registered), thus only flat market 1 can call"
           ).to.revertedWith("Clerk::allowed:: invalid market");
 
-          const balAfter = await stakingTokens[0].balanceOf(alice.address);
+          balAfter = await stakingTokens[0].balanceOf(alice.address);
           expect(balBefore.sub(balAfter)).to.eq(1000);
+
+          balBefore = await stakingTokens[0].balanceOf(alice.address);
+
+          await clerk.whitelistMarket(flatMarkets[0].address, false);
+
+          await expect(clerk.connect(alice).deposit(stakingTokens[0].address, alice.address, alice.address, 1000, 0)).to
+            .not.reverted;
+          balAfter = await stakingTokens[0].balanceOf(alice.address);
+          expect(balBefore.sub(balAfter)).to.eq(1000);
+          expect(await clerk.balanceOf(stakingTokens[0].address, alice.address)).to.be.equal(2000);
         });
       });
     });
