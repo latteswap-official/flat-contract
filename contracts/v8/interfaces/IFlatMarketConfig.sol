@@ -16,6 +16,8 @@ interface IFlatMerketConfig {
 
   function liquidationTreasuryBps(address _flatMarket) external view returns (uint256);
 
+  function closeFactorBps(address _flatMarket) external view returns (uint256);
+
   function minDebtSize(address _flatMarket) external view returns (uint256);
 
   function treasury() external view returns (address);

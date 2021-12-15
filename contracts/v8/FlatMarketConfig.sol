@@ -23,7 +23,8 @@ contract FlatMarketConfig is IFlatMerketConfig, OwnableUpgradeable {
     uint64 _liquidationPenalty,
     uint64 _liquidationTreasuryBps,
     uint64 _minDebtSize,
-    uint256 _interestPerSecond
+    uint256 _interestPerSecond,
+    uint64 _closeFactorBps
   );
 
   /// @notice Config fro the FlatMarkets
@@ -32,6 +33,7 @@ contract FlatMarketConfig is IFlatMerketConfig, OwnableUpgradeable {
     uint64 liquidationPenalty;
     uint64 liquidationTreasuryBps;
     uint64 minDebtSize;
+    uint64 closeFactorBps;
     uint256 interestPerSecond;
   }
 
@@ -80,6 +82,12 @@ contract FlatMarketConfig is IFlatMerketConfig, OwnableUpgradeable {
     return uint256(configs[_flatMarket].minDebtSize);
   }
 
+  /// @notice Return the closeFactorBps of the given market
+  /// @param _flatMarket The market address
+  function closeFactorBps(address _flatMarket) external view returns (uint256) {
+    return uint256(configs[_flatMarket].closeFactorBps);
+  }
+
   /// @notice Set the config for markets
   /// @param _markets The markets addresses
   /// @param _configs Configs for each market
@@ -97,13 +105,15 @@ contract FlatMarketConfig is IFlatMerketConfig, OwnableUpgradeable {
         _configs[i].liquidationTreasuryBps >= 500 && _configs[i].liquidationTreasuryBps <= 2000,
         "bad liquidationTreasuryBps"
       );
+      require(_configs[i].closeFactorBps <= 10000, "bad closeFactorBps");
 
       configs[_markets[i]] = Config({
         collateralFactor: _configs[i].collateralFactor,
         liquidationPenalty: _configs[i].liquidationPenalty,
         liquidationTreasuryBps: _configs[i].liquidationTreasuryBps,
         minDebtSize: _configs[i].minDebtSize,
-        interestPerSecond: _configs[i].interestPerSecond
+        interestPerSecond: _configs[i].interestPerSecond,
+        closeFactorBps: _configs[i].closeFactorBps
       });
       emit LogSetConfig(
         msg.sender,
@@ -112,7 +122,8 @@ contract FlatMarketConfig is IFlatMerketConfig, OwnableUpgradeable {
         _configs[i].liquidationPenalty,
         _configs[i].liquidationTreasuryBps,
         _configs[i].minDebtSize,
-        _configs[i].interestPerSecond
+        _configs[i].interestPerSecond,
+        _configs[i].closeFactorBps
       );
     }
   }
