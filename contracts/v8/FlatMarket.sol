@@ -138,6 +138,16 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     _;
   }
 
+  /// @notice check debt size after an execution
+  modifier checkDebtSize() {
+    _;
+    if (debtShareToValue(userDebtShare[msg.sender]) == 0) return;
+    require(
+      debtShareToValue(userDebtShare[msg.sender]) >= marketConfig.minDebtSize(address(this)),
+      "invalid debt size"
+    );
+  }
+
   /// @notice Update oracle
   function setOracle(IOracle _oracle, bytes calldata _data) external onlyOwner {
     require(address(oracle) != address(0), "oracle cannot be address 0");
@@ -191,7 +201,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   /// @dev msg.sender borrow "_amount" of FLAT and transfer to "_to"
   /// @param _to The address to received borrowed FLAT
   /// @param _amount The amount of FLAT to be borrowed
-  function _borrow(address _to, uint256 _amount) internal returns (uint256 _debtShare, uint256 _share) {
+  function _borrow(address _to, uint256 _amount) internal checkDebtSize returns (uint256 _debtShare, uint256 _share) {
     // 1. Find out debtShare from the give "_value" that msg.sender wish to borrow
     _debtShare = debtValueToShare(_amount);
 
@@ -669,7 +679,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   /// @notice Perform the actual repay.
   /// @param _for The address to repay debt.
   /// @param _debtValue The debt value to be repaid.
-  function _repay(address _for, uint256 _debtValue) internal returns (uint256 _debtShare) {
+  function _repay(address _for, uint256 _debtValue) internal checkDebtSize returns (uint256 _debtShare) {
     // 1. Findout "_debtShare" from the given "_debtValue"
     _debtShare = debtValueToShare(_debtValue);
 
