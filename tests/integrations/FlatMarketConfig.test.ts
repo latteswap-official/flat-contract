@@ -60,6 +60,7 @@ describe("FlatMarketConfig", () => {
                   liquidationTreasuryBps: 1000,
                   minDebtSize: ethers.utils.parseEther("1"),
                   interestPerSecond: 1,
+                  closeFactorBps: 100,
                 },
               ]
             )
@@ -79,6 +80,7 @@ describe("FlatMarketConfig", () => {
                   liquidationTreasuryBps: 1000,
                   minDebtSize: ethers.utils.parseEther("1"),
                   interestPerSecond: 1,
+                  closeFactorBps: 100,
                 },
               ]
             )
@@ -94,6 +96,7 @@ describe("FlatMarketConfig", () => {
                   liquidationTreasuryBps: 1000,
                   minDebtSize: ethers.utils.parseEther("1"),
                   interestPerSecond: 1,
+                  closeFactorBps: 100,
                 },
               ]
             )
@@ -113,6 +116,7 @@ describe("FlatMarketConfig", () => {
                   liquidationTreasuryBps: 1000,
                   minDebtSize: ethers.utils.parseEther("1"),
                   interestPerSecond: 1,
+                  closeFactorBps: 100,
                 },
               ]
             )
@@ -128,6 +132,7 @@ describe("FlatMarketConfig", () => {
                   liquidationTreasuryBps: 1000,
                   minDebtSize: ethers.utils.parseEther("1"),
                   interestPerSecond: 1,
+                  closeFactorBps: 100,
                 },
               ]
             )
@@ -147,6 +152,7 @@ describe("FlatMarketConfig", () => {
                   liquidationTreasuryBps: 300,
                   minDebtSize: ethers.utils.parseEther("1"),
                   interestPerSecond: 1,
+                  closeFactorBps: 100,
                 },
               ]
             )
@@ -162,10 +168,31 @@ describe("FlatMarketConfig", () => {
                   liquidationTreasuryBps: 10000,
                   minDebtSize: ethers.utils.parseEther("1"),
                   interestPerSecond: 1,
+                  closeFactorBps: 100,
                 },
               ]
             )
           ).to.be.revertedWith("bad liquidationTreasuryBps");
+        });
+      });
+
+      context("when close factor bps exceed 10000 (100%)", () => {
+        it("should revert", async () => {
+          await expect(
+            flatMarketConfig.setConfig(
+              [aliceAddress],
+              [
+                {
+                  collateralFactor: 8500,
+                  liquidationPenalty: 10500,
+                  liquidationTreasuryBps: 1000,
+                  minDebtSize: ethers.utils.parseEther("1"),
+                  interestPerSecond: 1,
+                  closeFactorBps: 10001,
+                },
+              ]
+            )
+          ).to.be.revertedWith("bad closeFactorBps");
         });
       });
 
@@ -180,6 +207,7 @@ describe("FlatMarketConfig", () => {
                 liquidationTreasuryBps: 1000,
                 minDebtSize: ethers.utils.parseEther("1"),
                 interestPerSecond: 1,
+                closeFactorBps: 100,
               },
             ]
           );
@@ -205,6 +233,7 @@ describe("FlatMarketConfig", () => {
                 liquidationTreasuryBps: 1000,
                 minDebtSize: ethers.utils.parseEther("1"),
                 interestPerSecond: 1,
+                closeFactorBps: 100,
               },
             ]
           )

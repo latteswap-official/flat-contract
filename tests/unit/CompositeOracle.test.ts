@@ -123,6 +123,44 @@ describe("CompositeOracle", () => {
           expect(await compositeOracle.primarySources(simpleToken.address, index)).to.eq(mockOracles[index].address);
         }
       });
+
+      it("should overwrite the previous sources", async () => {
+        await compositeOracle.setPrimarySources(
+          simpleToken.address,
+          constants.WeiPerEther,
+          mockOracles.slice(0, 2).map((mockOracle) => mockOracle.address),
+          mockOracles.slice(0, 2).map((_, index) => ethers.utils.defaultAbiCoder.encode(["uint256"], [index]))
+        );
+
+        expect(await compositeOracle.primarySourceCount(simpleToken.address)).to.eq(2);
+
+        for (const index in mockOracles.slice(0, 2)) {
+          expect(await compositeOracle.oracleDatas(simpleToken.address, index)).to.eq(
+            ethers.utils.defaultAbiCoder.encode(["uint256"], [index])
+          );
+          expect(await compositeOracle.primarySources(simpleToken.address, index)).to.eq(
+            mockOracles.slice(0, 2)[index].address
+          );
+        }
+
+        await compositeOracle.setPrimarySources(
+          simpleToken.address,
+          constants.WeiPerEther,
+          mockOracles.slice(1, 3).map((mockOracle) => mockOracle.address),
+          mockOracles.slice(1, 3).map((_, index) => ethers.utils.defaultAbiCoder.encode(["uint256"], [index]))
+        );
+
+        expect(await compositeOracle.primarySourceCount(simpleToken.address)).to.eq(2);
+
+        for (const index in mockOracles.slice(1, 3)) {
+          expect(await compositeOracle.oracleDatas(simpleToken.address, index)).to.eq(
+            ethers.utils.defaultAbiCoder.encode(["uint256"], [index])
+          );
+          expect(await compositeOracle.primarySources(simpleToken.address, index)).to.eq(
+            mockOracles.slice(1, 3)[index].address
+          );
+        }
+      });
     });
   });
 

@@ -43,6 +43,7 @@ describe("FlatMarket", () => {
   const LIQUIDATION_TREASURY_BPS = ethers.BigNumber.from("1000");
   const MAX_COLLATERAL_RATIO = ethers.BigNumber.from("8500");
   const INTEREST_PER_SECOND = ethers.utils.parseEther("0.005").div(365 * 24 * 60 * 60);
+  const CLOSE_FACTOR_BPS_10000 = 10000;
 
   // Accounts
   let deployer: Signer;
@@ -230,19 +231,14 @@ describe("FlatMarket", () => {
       flat.address,
     ])) as TreasuryHolder;
     await treasuryHolder.deployed();
-
     // Whitelist market to allow market to access funds in Clerk
     await clerk.whitelistMarket(usdcUsdtLpMarket.address, true);
-
     // Mint FLAT to deployer
     await flat.mint(deployerAddress, ethers.utils.parseEther("700000000"));
-
     // Increase timestamp by 1 day to allow more FLAT to be minted
     await timeHelpers.increaseTimestamp(timeHelpers.DAY);
-
     // Replenish FLAT to usdcUsdtLpMarket
     await flat.replenish(usdcUsdtLpMarket.address, ethers.utils.parseEther("100000000"), clerk.address);
-
     // Assuming someone try to borrow FLAT from usdcUsdtLpMarket when it is not setup yet
     await usdcUsdtLp.approve(clerk.address, ethers.constants.MaxUint256);
     await expect(
@@ -255,12 +251,10 @@ describe("FlatMarket", () => {
       ),
       "if oracle get stale > 1 day, it will be reverted as no valid source"
     ).to.be.revertedWith("CompositeOracle::get::price stale");
-
     // Feed offchain price again
     await offChainOracle.setPrices([usdcUsdtLp.address], [usdt.address], [ethers.utils.parseEther("1")]);
     // update composit oracle price after offchain feeding the latest price
     await compositOracle.setPrices([ethers.utils.defaultAbiCoder.encode(["address"], [usdcUsdtLp.address])]);
-
     await expect(
       usdcUsdtLpMarket.depositAndBorrow(
         deployerAddress,
@@ -270,7 +264,6 @@ describe("FlatMarket", () => {
         ethers.utils.parseEther("1")
       )
     ).to.be.revertedWith("bad collateralFactor");
-
     // Config market
     await flatMarketConfig.setConfig(
       [usdcUsdtLpMarket.address],
@@ -281,10 +274,10 @@ describe("FlatMarket", () => {
           liquidationTreasuryBps: LIQUIDATION_TREASURY_BPS,
           interestPerSecond: INTEREST_PER_SECOND,
           minDebtSize: MIN_DEBT_SIZE,
+          closeFactorBps: CLOSE_FACTOR_BPS_10000,
         },
       ]
     );
-
     // Connect contracts to Alice
     usdcUsdtLpAsAlice = SimpleToken__factory.connect(usdcUsdtLp.address, alice);
     usdcUsdtLpMarketAsAlice = FlatMarket__factory.connect(usdcUsdtLpMarket.address, alice);
@@ -299,7 +292,6 @@ describe("FlatMarket", () => {
     usdcUsdtLpAsCat = SimpleToken__factory.connect(usdcUsdtLp.address, cat);
     usdcUsdtLpMarketAsCat = FlatMarket__factory.connect(usdcUsdtLpMarket.address, cat);
     flatAsCat = FLAT__factory.connect(flat.address, cat);
-
     // Transfer usdcUsdtLp to Alice and Bob
     await usdcUsdtLp.transfer(aliceAddress, ethers.utils.parseEther("100000000"));
     await usdcUsdtLp.transfer(bobAddress, ethers.utils.parseEther("100000000"));
@@ -432,8 +424,8 @@ describe("FlatMarket", () => {
         // Alice add collateral
         await usdcUsdtLpMarketAsAlice.addCollateral(aliceAddress, collateralAmount);
 
-        expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(collateralAmount);
-        expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
+        expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+        expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(collateralAmount);
         expect(await usdcUsdtLp.balanceOf(clerk.address)).to.be.eq(collateralAmount);
         expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount);
         expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
@@ -446,7 +438,8 @@ describe("FlatMarket", () => {
         await usdcUsdtLpMarketAsAlice.addCollateral(bobAddress, collateralAmount);
         // Expect that Bob should credited collateral
         expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
-        expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(collateralAmount);
+        expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(collateralAmount);
+        expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
         expect(await usdcUsdtLp.balanceOf(clerk.address)).to.be.eq(collateralAmount);
         expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount);
         expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(0);
@@ -473,8 +466,8 @@ describe("FlatMarket", () => {
       // Alice add collateral to the market
       await usdcUsdtLpMarketAsAlice.addCollateral(aliceAddress, collateralAmount);
 
-      expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(collateralAmount);
-      expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
+      expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+      expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(collateralAmount);
       expect(await usdcUsdtLp.balanceOf(clerk.address)).to.be.eq(collateralAmount);
       expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount);
       expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
@@ -749,8 +742,8 @@ describe("FlatMarket", () => {
 
         expect(aliceBefore.sub(aliceAfter)).to.be.eq(amount);
         expect(await usdcUsdtLp.balanceOf(clerk.address)).to.be.eq(amount);
-        expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
-        expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(amount);
+        expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(amount);
+        expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
         expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(amount);
       });
     });
@@ -765,8 +758,8 @@ describe("FlatMarket", () => {
         expect(aliceBefore.sub(aliceAfter)).to.be.eq(amount);
         expect(await usdcUsdtLp.balanceOf(clerk.address)).to.be.eq(amount);
         expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
-        expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(0);
-        expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(amount);
+        expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(amount);
+        expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
         expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(0);
         expect(await usdcUsdtLpMarket.userCollateralShare(bobAddress)).to.be.eq(amount);
       });
@@ -926,8 +919,8 @@ describe("FlatMarket", () => {
       const aliceUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(aliceAddress);
 
       expect(aliceUsdcUsdtLpBefore.sub(aliceUsdcUsdtLpAfter)).to.be.eq(collateralAmount);
-      expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(collateralAmount);
-      expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
+      expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+      expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(collateralAmount);
       expect(await usdcUsdtLp.balanceOf(clerk.address)).to.be.eq(collateralAmount);
       expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount);
       expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
@@ -946,30 +939,41 @@ describe("FlatMarket", () => {
 
     context("when Alice repay to her account", async () => {
       context("when she repay all borrowed FLAT", async () => {
-        it("should have some interest left", async () => {
-          const usdcUsdtLpMarketFlatBefore = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
-          await usdcUsdtLpMarketAsAlice.depositAndRepay(aliceAddress, repayFunds);
-          const usdcUsdtLpMarketFlatAfter = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
-          stages["aliceDepositAndRepay"] = [await timeHelpers.latestTimestamp()];
+        context("when there are some interests left and less than min debt size", () => {
+          it("should revert as invalid debt size", async () => {
+            await expect(usdcUsdtLpMarketAsAlice.depositAndRepay(aliceAddress, repayFunds)).to.be.revertedWith(
+              "invalid debt size"
+            );
+          });
+        });
+        context("when are some interests left and gte min debt size", () => {
+          it("should successfully repay with some interests left", async () => {
+            const usdcUsdtLpMarketFlatBefore = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
+            await usdcUsdtLpMarketAsAlice.depositAndRepay(aliceAddress, repayFunds.sub(ethers.utils.parseEther("1")));
+            const usdcUsdtLpMarketFlatAfter = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
+            stages["aliceDepositAndRepay"] = [await timeHelpers.latestTimestamp()];
 
-          totalDebtValue = totalDebtValue.add(
-            calculateAccruedInterest(
-              stages["aliceDepositAndBorrow"][0],
-              stages["aliceDepositAndRepay"][0],
-              totalDebtValue,
-              INTEREST_PER_SECOND
-            )
-          );
+            totalDebtValue = totalDebtValue.add(
+              calculateAccruedInterest(
+                stages["aliceDepositAndBorrow"][0],
+                stages["aliceDepositAndRepay"][0],
+                totalDebtValue,
+                INTEREST_PER_SECOND
+              )
+            );
 
-          expect(usdcUsdtLpMarketFlatAfter.sub(usdcUsdtLpMarketFlatBefore)).to.be.eq(repayFunds);
-          expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(collateralAmount);
-          expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
-          expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(0);
-          expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount);
-          expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
-          expect(await usdcUsdtLpMarket.debtShareToValue(await usdcUsdtLpMarket.userDebtShare(aliceAddress))).to.be.eq(
-            totalDebtValue.sub(repayFunds)
-          );
+            expect(usdcUsdtLpMarketFlatAfter.sub(usdcUsdtLpMarketFlatBefore)).to.be.eq(
+              repayFunds.sub(ethers.utils.parseEther("1"))
+            );
+            expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+            expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(collateralAmount);
+            expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(0);
+            expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount);
+            expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
+            expect(
+              await usdcUsdtLpMarket.debtShareToValue(await usdcUsdtLpMarket.userDebtShare(aliceAddress))
+            ).to.be.eq(totalDebtValue.sub(repayFunds.sub(ethers.utils.parseEther("1"))));
+          });
         });
       });
     });
@@ -1008,8 +1012,8 @@ describe("FlatMarket", () => {
 
         const expectedTotalCollateral = collateralAmount.add(bobCollateralAmount);
         expect(bobUsdcUsdtLpBefore.sub(bobUsdcUsdtLpAfter)).to.be.eq(bobCollateralAmount);
-        expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(expectedTotalCollateral);
-        expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(0);
+        expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+        expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(bobCollateralAmount);
         expect(await usdcUsdtLp.balanceOf(clerk.address)).to.be.eq(expectedTotalCollateral);
         expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(expectedTotalCollateral);
         expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
@@ -1053,11 +1057,9 @@ describe("FlatMarket", () => {
           );
 
           expect(usdcUsdtLpMarketFlatAfter.sub(usdcUsdtLpMarketFlatBefore)).to.be.eq(repayFunds);
-          expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
-            collateralAmount.add(bobCollateralAmount)
-          );
-          expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
-          expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(0);
+          expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+          expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(collateralAmount);
+          expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(bobCollateralAmount);
           expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount.add(bobCollateralAmount));
           expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
           expect(await usdcUsdtLpMarket.userCollateralShare(bobAddress)).to.be.eq(bobCollateralAmount);
@@ -1088,11 +1090,9 @@ describe("FlatMarket", () => {
           const expectedAliceDebtValue = debtHelpers.debtShareToValue(borrowAmount, totalDebtShare, totalDebtValue);
 
           expect(usdcUsdtLpMarketFlatAfter.sub(usdcUsdtLpMarketFlatBefore)).to.be.eq(expectedAliceDebtValue);
-          expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
-            collateralAmount.add(bobCollateralAmount)
-          );
-          expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
-          expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(0);
+          expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+          expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(collateralAmount);
+          expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(bobCollateralAmount);
           expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount.add(bobCollateralAmount));
           expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
           expect(await usdcUsdtLpMarket.userCollateralShare(bobAddress)).to.be.eq(bobCollateralAmount);
@@ -1111,8 +1111,8 @@ describe("FlatMarket", () => {
       const aliceUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(aliceAddress);
 
       expect(aliceUsdcUsdtLpBefore.sub(aliceUsdcUsdtLpAfter)).to.be.eq(collateralAmount);
-      expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(collateralAmount);
-      expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
+      expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+      expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(collateralAmount);
       expect(await usdcUsdtLp.balanceOf(clerk.address)).to.be.eq(collateralAmount);
       expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount);
       expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
@@ -1215,6 +1215,7 @@ describe("FlatMarket", () => {
               liquidationTreasuryBps: LIQUIDATION_TREASURY_BPS,
               interestPerSecond: 0,
               minDebtSize: MIN_DEBT_SIZE,
+              closeFactorBps: CLOSE_FACTOR_BPS_10000,
             },
           ]
         );
@@ -1269,10 +1270,10 @@ describe("FlatMarket", () => {
               const aliceUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(aliceAddress);
 
               expect(aliceUsdcUsdtLpAfter.sub(aliceUsdcUsdtLpBefore)).to.be.eq(removeCollateral);
-              expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
+              expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+              expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(
                 collateralAmount.sub(removeCollateral)
               );
-              expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
               expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount.sub(removeCollateral));
               expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(
                 collateralAmount.sub(removeCollateral)
@@ -1321,10 +1322,10 @@ describe("FlatMarket", () => {
               const aliceUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(aliceAddress);
 
               expect(aliceUsdcUsdtLpAfter.sub(aliceUsdcUsdtLpBefore)).to.be.eq(removeCollateral);
-              expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
+              expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+              expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(
                 collateralAmount.sub(removeCollateral)
               );
-              expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
               expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount.sub(removeCollateral));
               expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(
                 collateralAmount.sub(removeCollateral)
@@ -1374,10 +1375,10 @@ describe("FlatMarket", () => {
 
               expect(aliceUsdcUsdtLpAfter.sub(aliceUsdcUsdtLpBefore)).to.be.eq(0);
               expect(bobUsdcUsdtLpAfter.sub(bobUsdcUsdtLpBefore)).to.be.eq(removeCollateral);
-              expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
+              expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+              expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(
                 collateralAmount.sub(removeCollateral)
               );
-              expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
               expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount.sub(removeCollateral));
               expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(
                 collateralAmount.sub(removeCollateral)
@@ -1429,10 +1430,10 @@ describe("FlatMarket", () => {
 
               expect(aliceUsdcUsdtLpAfter.sub(aliceUsdcUsdtLpBefore)).to.be.eq(0);
               expect(bobUsdcUsdtLpAfter.sub(bobUsdcUsdtLpBefore)).to.be.eq(removeCollateral);
-              expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
+              expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+              expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(
                 collateralAmount.sub(removeCollateral)
               );
-              expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
               expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount.sub(removeCollateral));
               expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(
                 collateralAmount.sub(removeCollateral)
@@ -1456,6 +1457,7 @@ describe("FlatMarket", () => {
                 liquidationTreasuryBps: LIQUIDATION_TREASURY_BPS,
                 interestPerSecond: 0,
                 minDebtSize: MIN_DEBT_SIZE,
+                closeFactorBps: CLOSE_FACTOR_BPS_10000,
               },
             ]
           );
@@ -1515,10 +1517,10 @@ describe("FlatMarket", () => {
 
                 expect(aliceUsdcUsdtLpAfter.sub(aliceUsdcUsdtLpBefore)).to.be.eq(removeCollateral);
                 expect(bobUsdcUsdtLpAfter.sub(bobUsdcUsdtLpBefore)).to.be.eq(0);
-                expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
-                  collateralAmount.mul(2).sub(removeCollateral)
+                expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+                expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(
+                  collateralAmount.sub(removeCollateral)
                 );
-                expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
                 expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(
                   collateralAmount.mul(2).sub(removeCollateral)
                 );
@@ -1575,10 +1577,10 @@ describe("FlatMarket", () => {
                 expect(bobDebtShareAfter).to.be.lt(bobDebtShareBefore);
                 expect(aliceUsdcUsdtLpAfter.sub(aliceUsdcUsdtLpBefore)).to.be.eq(removeCollateral);
                 expect(bobUsdcUsdtLpAfter.sub(bobUsdcUsdtLpBefore)).to.be.eq(0);
-                expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
-                  collateralAmount.mul(2).sub(removeCollateral)
+                expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+                expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(
+                  collateralAmount.sub(removeCollateral)
                 );
-                expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
                 expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(
                   collateralAmount.mul(2).sub(removeCollateral)
                 );
@@ -2193,8 +2195,7 @@ describe("FlatMarket", () => {
       expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(0);
 
       await usdcUsdtLpMarketAsAlice.addCollateral(aliceAddress, collateralAmount);
-      expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(collateralAmount);
-      expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
+      expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(collateralAmount);
       expect(await usdcUsdtLp.balanceOf(clerk.address)).to.be.eq(collateralAmount);
       expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount);
       expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
@@ -2289,6 +2290,7 @@ describe("FlatMarket", () => {
               liquidationTreasuryBps: LIQUIDATION_TREASURY_BPS,
               interestPerSecond: 0,
               minDebtSize: MIN_DEBT_SIZE,
+              closeFactorBps: CLOSE_FACTOR_BPS_10000,
             },
           ]
         );
@@ -2334,10 +2336,8 @@ describe("FlatMarket", () => {
             const aliceUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(aliceAddress);
 
             expect(aliceUsdcUsdtLpAfter.sub(aliceUsdcUsdtLpBefore)).to.be.eq(0);
-            expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
-              collateralAmount.sub(removeCollateral)
-            );
-            expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(removeCollateral);
+            expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+            expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(collateralAmount);
             expect(await clerk.balanceOf(flat.address, aliceAddress)).to.be.eq(borrowAmount);
             expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount.sub(removeCollateral));
             expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(
@@ -2376,10 +2376,10 @@ describe("FlatMarket", () => {
             const aliceUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(aliceAddress);
 
             expect(aliceUsdcUsdtLpAfter.sub(aliceUsdcUsdtLpBefore)).to.be.eq(0);
-            expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
+            expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+            expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(
               collateralAmount.sub(removeCollateral)
             );
-            expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
             expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(removeCollateral);
             expect(await clerk.balanceOf(flat.address, aliceAddress)).to.be.eq(borrowAmount);
             expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount.sub(removeCollateral));
@@ -2408,8 +2408,8 @@ describe("FlatMarket", () => {
       expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(0);
 
       await usdcUsdtLpMarketAsAlice.addCollateral(aliceAddress, collateralAmount);
-      expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(collateralAmount);
-      expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
+      expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+      expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(collateralAmount);
       expect(await usdcUsdtLp.balanceOf(clerk.address)).to.be.eq(collateralAmount);
       expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount);
       expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
@@ -2507,6 +2507,7 @@ describe("FlatMarket", () => {
               liquidationTreasuryBps: LIQUIDATION_TREASURY_BPS,
               interestPerSecond: 0,
               minDebtSize: MIN_DEBT_SIZE,
+              closeFactorBps: CLOSE_FACTOR_BPS_10000,
             },
           ]
         );
@@ -2552,10 +2553,10 @@ describe("FlatMarket", () => {
             const aliceUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(aliceAddress);
 
             expect(aliceUsdcUsdtLpAfter.sub(aliceUsdcUsdtLpBefore)).to.be.eq(removeCollateral);
-            expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
+            expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+            expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(
               collateralAmount.sub(removeCollateral)
             );
-            expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
             expect(await clerk.balanceOf(flat.address, aliceAddress)).to.be.eq(borrowAmount);
             expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount.sub(removeCollateral));
             expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(
@@ -2597,10 +2598,10 @@ describe("FlatMarket", () => {
 
             expect(aliceUsdcUsdtLpAfter.sub(aliceUsdcUsdtLpBefore)).to.be.eq(0);
             expect(bobUsdcUsdtLpAfter.sub(bobUsdcUsdtLpBefore)).to.be.eq(removeCollateral);
-            expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
+            expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+            expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(
               collateralAmount.sub(removeCollateral)
             );
-            expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
             expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(0);
             expect(await clerk.balanceOf(flat.address, aliceAddress)).to.be.eq(borrowAmount);
             expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount.sub(removeCollateral));
@@ -2639,8 +2640,8 @@ describe("FlatMarket", () => {
       const aliceUsdcUsdtLpAfter = await usdcUsdtLp.balanceOf(aliceAddress);
 
       expect(aliceUsdcUsdtLpBefore.sub(aliceUsdcUsdtLpAfter)).to.be.eq(collateralAmount);
-      expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(collateralAmount);
-      expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
+      expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+      expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(collateralAmount);
       expect(await usdcUsdtLp.balanceOf(clerk.address)).to.be.eq(collateralAmount);
       expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount);
       expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
@@ -2674,30 +2675,34 @@ describe("FlatMarket", () => {
       });
 
       context("when she repay all borrowed FLAT", async () => {
-        it("should have some interest left", async () => {
-          const usdcUsdtLpMarketFlatBefore = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
-          await usdcUsdtLpMarketAsAlice.repay(aliceAddress, repayFunds);
-          const usdcUsdtLpMarketFlatAfter = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
-          stages["aliceRepay"] = [await timeHelpers.latestTimestamp()];
+        context("when valid debt size", () => {
+          it("should have some interest left", async () => {
+            const usdcUsdtLpMarketFlatBefore = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
+            await usdcUsdtLpMarketAsAlice.repay(aliceAddress, repayFunds.sub(ethers.utils.parseEther("1")));
+            const usdcUsdtLpMarketFlatAfter = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
+            stages["aliceRepay"] = [await timeHelpers.latestTimestamp()];
 
-          totalDebtValue = totalDebtValue.add(
-            calculateAccruedInterest(
-              stages["aliceDeposit"][0],
-              stages["aliceRepay"][0],
-              totalDebtValue,
-              INTEREST_PER_SECOND
-            )
-          );
+            totalDebtValue = totalDebtValue.add(
+              calculateAccruedInterest(
+                stages["aliceDeposit"][0],
+                stages["aliceRepay"][0],
+                totalDebtValue,
+                INTEREST_PER_SECOND
+              )
+            );
 
-          expect(usdcUsdtLpMarketFlatAfter.sub(usdcUsdtLpMarketFlatBefore)).to.be.eq(repayFunds);
-          expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(collateralAmount);
-          expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
-          expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(0);
-          expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount);
-          expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
-          expect(await usdcUsdtLpMarket.debtShareToValue(await usdcUsdtLpMarket.userDebtShare(aliceAddress))).to.be.eq(
-            totalDebtValue.sub(repayFunds)
-          );
+            expect(usdcUsdtLpMarketFlatAfter.sub(usdcUsdtLpMarketFlatBefore)).to.be.eq(
+              repayFunds.sub(ethers.utils.parseEther("1"))
+            );
+            expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+            expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(collateralAmount);
+            expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(0);
+            expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount);
+            expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
+            expect(
+              await usdcUsdtLpMarket.debtShareToValue(await usdcUsdtLpMarket.userDebtShare(aliceAddress))
+            ).to.be.eq(totalDebtValue.sub(repayFunds.sub(ethers.utils.parseEther("1"))));
+          });
         });
       });
     });
@@ -2736,8 +2741,8 @@ describe("FlatMarket", () => {
 
         const expectedTotalCollateral = collateralAmount.add(bobCollateralAmount);
         expect(bobUsdcUsdtLpBefore.sub(bobUsdcUsdtLpAfter)).to.be.eq(bobCollateralAmount);
-        expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(expectedTotalCollateral);
-        expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(0);
+        expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+        expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(bobCollateralAmount);
         expect(await usdcUsdtLp.balanceOf(clerk.address)).to.be.eq(expectedTotalCollateral);
         expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(expectedTotalCollateral);
         expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
@@ -2792,11 +2797,9 @@ describe("FlatMarket", () => {
           );
 
           expect(usdcUsdtLpMarketFlatAfter.sub(usdcUsdtLpMarketFlatBefore)).to.be.eq(repayFunds);
-          expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
-            collateralAmount.add(bobCollateralAmount)
-          );
-          expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
-          expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(0);
+          expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+          expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(collateralAmount);
+          expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(bobCollateralAmount);
           expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount.add(bobCollateralAmount));
           expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
           expect(await usdcUsdtLpMarket.userCollateralShare(bobAddress)).to.be.eq(bobCollateralAmount);
@@ -2827,11 +2830,9 @@ describe("FlatMarket", () => {
           const expectedAliceDebtValue = debtHelpers.debtShareToValue(borrowAmount, totalDebtShare, totalDebtValue);
 
           expect(usdcUsdtLpMarketFlatAfter.sub(usdcUsdtLpMarketFlatBefore)).to.be.eq(expectedAliceDebtValue);
-          expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(
-            collateralAmount.add(bobCollateralAmount)
-          );
-          expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(0);
-          expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(0);
+          expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+          expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(collateralAmount);
+          expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(bobCollateralAmount);
           expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount.add(bobCollateralAmount));
           expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
           expect(await usdcUsdtLpMarket.userCollateralShare(bobAddress)).to.be.eq(bobCollateralAmount);

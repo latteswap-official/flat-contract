@@ -4,7 +4,14 @@ import { solidity } from "ethereum-waffle";
 import { clerkUnitTestFixture } from "../helpers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { Wallet } from "@ethersproject/wallet";
-import { Clerk, Clerk__factory, NonNativeReceivableToken, SimpleToken, SimpleToken__factory } from "../../typechain/v8";
+import {
+  Clerk,
+  Clerk__factory,
+  FlatMarket,
+  NonNativeReceivableToken,
+  SimpleToken,
+  SimpleToken__factory,
+} from "../../typechain/v8";
 import { BigNumber, constants } from "ethers";
 import { MockContract } from "@defi-wonderland/smock";
 import { MockWBNB } from "@latteswap/latteswap-contract/compiled-typechain";
@@ -23,6 +30,7 @@ describe("Clerk", () => {
   let clerk: MockContract<Clerk>;
   let stakingTokens: Array<SimpleToken>;
   let nonNativeReceivableToken: NonNativeReceivableToken;
+  let flatMarkets: Array<FlatMarket>;
 
   const extremeValidVolume = BigNumber.from(2).pow(127);
   const vaultProtocolLimit = BigNumber.from(2).pow(128).sub(1);
@@ -42,6 +50,7 @@ describe("Clerk", () => {
       clerk,
       stakingTokens,
       nonNativeReceivableToken,
+      flatMarkets,
     } = await waffle.loadFixture(clerkUnitTestFixture));
 
     clerkAsAlice = Clerk__factory.connect(clerk.address, alice);
@@ -214,66 +223,91 @@ describe("Clerk", () => {
       expect(await clerk.balanceOf(stakingTokens[0].address, alice.address)).to.be.equal(0);
     });
 
-    context("when msg sender != _from", () => {
-      it("Mutates balanceOf correctly by deducting value from _from", async function () {
-        await clerk.whitelistMarket(bob.address, true);
-        await stakingTokens[1].connect(alice).approve(clerkAsAlice.address, 1000);
-        const balBefore = await stakingTokens[1].balanceOf(alice.address);
-        await expect(
-          clerk.connect(bob).deposit(stakingTokens[1].address, alice.address, alice.address, 1, 0)
-        ).to.not.emit(stakingTokens[1], "Transfer");
-        await expect(
-          clerk.connect(bob).deposit(stakingTokens[1].address, alice.address, alice.address, 999, 0)
-        ).to.not.emit(stakingTokens[1], "Transfer");
+    context("when the token has no any markets registered", () => {
+      context("when msg sender == _from", () => {
+        it("Mutates balanceOf correctly by deducting value from _from", async function () {
+          await stakingTokens[1].connect(alice).approve(clerkAsAlice.address, 1000);
+          const balBefore = await stakingTokens[1].balanceOf(alice.address);
+          await expect(clerkAsAlice.deposit(stakingTokens[1].address, alice.address, alice.address, 1, 0)).to.not.emit(
+            stakingTokens[1],
+            "Transfer"
+          );
+          await expect(
+            clerkAsAlice.deposit(stakingTokens[1].address, alice.address, alice.address, 999, 0)
+          ).to.not.emit(stakingTokens[1], "Transfer");
 
-        await expect(
-          clerk.connect(bob).deposit(stakingTokens[1].address, alice.address, alice.address, 0, 1000)
-        ).to.emit(stakingTokens[1], "Transfer");
+          await expect(clerkAsAlice.deposit(stakingTokens[1].address, alice.address, alice.address, 0, 1000)).to.emit(
+            stakingTokens[1],
+            "Transfer"
+          );
 
-        const balAfter = await stakingTokens[1].balanceOf(alice.address);
-        expect(balBefore.sub(balAfter)).to.eq(1000);
+          const balAfter = await stakingTokens[1].balanceOf(alice.address);
+          expect(balBefore.sub(balAfter)).to.eq(1000);
 
-        await stakingTokens[0].connect(alice).approve(clerkAsAlice.address, 1300);
+          await stakingTokens[0].connect(alice).approve(clerkAsAlice.address, 1300);
 
-        await expect(clerk.connect(bob).deposit(stakingTokens[0].address, alice.address, alice.address, 1300, 0))
-          .to.emit(stakingTokens[0], "Transfer")
-          .withArgs(alice.address, clerkAsAlice.address, "1300")
-          .to.emit(clerk, "LogDeposit")
-          .withArgs(stakingTokens[0].address, alice.address, alice.address, "1300", "1300");
-        expect(await clerkAsAlice.balanceOf(stakingTokens[0].address, alice.address)).to.be.equal(1300);
+          await expect(clerkAsAlice.deposit(stakingTokens[0].address, alice.address, alice.address, 1300, 0))
+            .to.emit(stakingTokens[0], "Transfer")
+            .withArgs(alice.address, clerkAsAlice.address, "1300")
+            .to.emit(clerk, "LogDeposit")
+            .withArgs(stakingTokens[0].address, alice.address, alice.address, "1300", "1300");
+          expect(await clerkAsAlice.balanceOf(stakingTokens[0].address, alice.address)).to.be.equal(1300);
+        });
+      });
+
+      context("when msg sender != _from", () => {
+        it("should reverted", async function () {
+          await expect(
+            clerk.connect(bob).deposit(stakingTokens[1].address, alice.address, alice.address, 1, 0)
+          ).to.revertedWith("Clerk::allowed:: msg.sender != from");
+        });
       });
     });
 
-    context("when msg sender == _from", () => {
-      it("Mutates balanceOf correctly by deducting value from _from", async function () {
-        await clerk.whitelistMarket(bob.address, true);
-        await stakingTokens[1].connect(alice).approve(clerkAsAlice.address, 1000);
-        const balBefore = await stakingTokens[1].balanceOf(alice.address);
-        await expect(clerkAsAlice.deposit(stakingTokens[1].address, alice.address, alice.address, 1, 0)).to.not.emit(
-          stakingTokens[1],
-          "Transfer"
-        );
-        await expect(clerkAsAlice.deposit(stakingTokens[1].address, alice.address, alice.address, 999, 0)).to.not.emit(
-          stakingTokens[1],
-          "Transfer"
-        );
+    context("when the token has a market registered", () => {
+      context("when the msg sender is not a whitelist market", () => {
+        it("should revert", async function () {
+          await clerk.whitelistMarket(flatMarkets[0].address, true);
+          await expect(
+            clerk.connect(alice).deposit(stakingTokens[0].address, alice.address, alice.address, 1, 0)
+          ).to.revertedWith("Clerk::allowed:: invalid market");
+        });
+      });
+      context("when msg sender != _From", () => {
+        it("Mutates balanceOf correctly by deducting value from _from", async function () {
+          await clerk.whitelistMarket(flatMarkets[0].address, true);
+          await clerk.whitelistMarket(flatMarkets[1].address, true);
 
-        await expect(clerkAsAlice.deposit(stakingTokens[1].address, alice.address, alice.address, 0, 1000)).to.emit(
-          stakingTokens[1],
-          "Transfer"
-        );
+          await stakingTokens[0].connect(alice).approve(clerkAsAlice.address, 1000);
+          await stakingTokens[1].connect(alice).approve(clerkAsAlice.address, 1000);
 
-        const balAfter = await stakingTokens[1].balanceOf(alice.address);
-        expect(balBefore.sub(balAfter)).to.eq(1000);
+          const balBefore = await stakingTokens[0].balanceOf(alice.address);
+          await expect(
+            clerk.connect(alice).deposit(stakingTokens[0].address, alice.address, alice.address, 1, 0)
+          ).to.revertedWith("Clerk::allowed:: invalid market");
 
-        await stakingTokens[0].connect(alice).approve(clerkAsAlice.address, 1300);
+          await expect(flatMarkets[0].connect(alice).deposit(stakingTokens[0].address, alice.address, 1)).to.not.emit(
+            stakingTokens[0],
+            "Transfer"
+          );
+          await expect(flatMarkets[0].connect(alice).deposit(stakingTokens[0].address, alice.address, 999)).to.not.emit(
+            stakingTokens[0],
+            "Transfer"
+          );
 
-        await expect(clerkAsAlice.deposit(stakingTokens[0].address, alice.address, alice.address, 1300, 0))
-          .to.emit(stakingTokens[0], "Transfer")
-          .withArgs(alice.address, clerkAsAlice.address, "1300")
-          .to.emit(clerk, "LogDeposit")
-          .withArgs(stakingTokens[0].address, alice.address, alice.address, "1300", "1300");
-        expect(await clerkAsAlice.balanceOf(stakingTokens[0].address, alice.address)).to.be.equal(1300);
+          await expect(flatMarkets[0].connect(alice).deposit(stakingTokens[0].address, alice.address, 1000)).to.emit(
+            stakingTokens[0],
+            "Transfer"
+          );
+
+          await expect(
+            flatMarkets[0].connect(alice).deposit(stakingTokens[1].address, alice.address, 1000),
+            "can not deposit a token having other market registered (stakingToken 1 has flat market 1 registered), thus only flat market 1 can call"
+          ).to.revertedWith("Clerk::allowed:: invalid market");
+
+          const balAfter = await stakingTokens[0].balanceOf(alice.address);
+          expect(balBefore.sub(balAfter)).to.eq(1000);
+        });
       });
     });
 
