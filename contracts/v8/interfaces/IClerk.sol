@@ -38,6 +38,7 @@ interface IClerk {
   event LogStrategyProfit(IERC20Upgradeable indexed token, uint256 amount);
   event LogStrategyLoss(IERC20Upgradeable indexed token, uint256 amount);
   event LogWhiteListMarket(address indexed market, bool approved);
+  event LogTokenToMarkets(address indexed market, address indexed token, bool approved);
 
   function balanceOf(IERC20Upgradeable, address) external view returns (uint256);
 
