@@ -376,14 +376,12 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
   /// @notice Deposit "_debtValue" FLAT to the vault, repay the debt, and withdraw "_collateralAmount" of collateral.
   /// @dev source of funds to repay debt will come from msg.sender, "_to" is beneficiary
-  /// @param _for The address to repay debt for.
   /// @param _to The address to received collateral token.
   /// @param _maxDebtReturn The maxium amount of FLAT to be return.
   /// @param _collateralAmount The amount of collateral to be withdrawn.
   /// @param _minPrice Minimum price to allow the repayment.
   /// @param _maxPrice Maximum price to allow the replayment.
   function depositRepayAndWithdraw(
-    address _for,
     address _to,
     uint256 _maxDebtReturn,
     uint256 _collateralAmount,
@@ -391,13 +389,13 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     uint256 _maxPrice
   ) external nonReentrant accrue updateCollateralPriceWithSlippageCheck(_minPrice, _maxPrice) checkSafe {
     // 1. Find out how much debt to repaid
-    uint256 _debtValue = MathUpgradeable.min(_maxDebtReturn, debtShareToValue(userDebtShare[_to]));
+    uint256 _debtValue = MathUpgradeable.min(_maxDebtReturn, debtShareToValue(userDebtShare[msg.sender]));
 
     // 2. Deposit FLAT to Vault for preparing to settle the debt
     _vaultDeposit(flat, msg.sender, _debtValue, 0);
 
     // 3. Repay the debt
-    _repay(_for, _debtValue);
+    _repay(msg.sender, _debtValue);
 
     // 4. Remove collateral from FlatMarket to "_to"
     uint256 _collateralShare = clerk.toShare(collateral, _collateralAmount, false);
