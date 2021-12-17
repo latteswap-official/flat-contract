@@ -220,7 +220,7 @@ export async function clerkIntegrationTestFixture(
   await clerk.setStrategy(stakingToken.address, latteSwapPoolStrategy.address);
   await clerk.setStrategyTargetBps(stakingToken.address, 10000);
   await latteSwapPoolStrategy.setTreasuryAccount(await deployer.getAddress());
-  await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.GOVERNANCE_ROLE(), clerk.address);
+  await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.STRATEGY_CALLER_ROLE(), clerk.address);
 
   return {
     deployer,

@@ -45,7 +45,7 @@ describe("PCSYieldStrategy", () => {
     context("with some rewards to be harvest", () => {
       it("should successfully stake to MasterChef with reward debt", async () => {
         const ownerAddress = await alice.getAddress();
-        await pcsYieldStrategy.grantRole(await pcsYieldStrategy.GOVERNANCE_ROLE(), ownerAddress);
+        await pcsYieldStrategy.grantRole(await pcsYieldStrategy.STRATEGY_CALLER_ROLE(), ownerAddress);
 
         // MOCK masterchef storages so that it can harvest
         await masterchef.setVariable("userInfo", {
@@ -129,7 +129,7 @@ describe("PCSYieldStrategy", () => {
     context("without rewards to be harvested", () => {
       it("should successfully stake to MasterChef", async () => {
         const ownerAddress = await alice.getAddress();
-        await pcsYieldStrategy.grantRole(await pcsYieldStrategy.GOVERNANCE_ROLE(), ownerAddress);
+        await pcsYieldStrategy.grantRole(await pcsYieldStrategy.STRATEGY_CALLER_ROLE(), ownerAddress);
 
         // MOCK masterchef storages so that it can harvest
         await masterchef.setVariable("userInfo", {
@@ -211,7 +211,7 @@ describe("PCSYieldStrategy", () => {
       it("should be able to withdraw the reward", async () => {
         // mock masterchef reward for stakingToken
         const ownerAddress = await alice.getAddress();
-        await pcsYieldStrategy.grantRole(await pcsYieldStrategy.GOVERNANCE_ROLE(), ownerAddress);
+        await pcsYieldStrategy.grantRole(await pcsYieldStrategy.STRATEGY_CALLER_ROLE(), ownerAddress);
 
         // MOCK masterchef storages
         await masterchef.setVariable("userInfo", {
@@ -275,7 +275,7 @@ describe("PCSYieldStrategy", () => {
       it("should successfully withdraw the reward", async () => {
         // mock masterchef reward for stakingToken
         const ownerAddress = await alice.getAddress();
-        await pcsYieldStrategy.grantRole(await pcsYieldStrategy.GOVERNANCE_ROLE(), ownerAddress);
+        await pcsYieldStrategy.grantRole(await pcsYieldStrategy.STRATEGY_CALLER_ROLE(), ownerAddress);
 
         // MOCK masterchef storages
         await masterchef.setVariable("userInfo", {
@@ -332,7 +332,7 @@ describe("PCSYieldStrategy", () => {
         it("should not return any reward with a correct accRewardBalance", async () => {
           // mock masterchef reward for stakingToken
           const ownerAddress = await alice.getAddress();
-          await pcsYieldStrategy.grantRole(await pcsYieldStrategy.GOVERNANCE_ROLE(), ownerAddress);
+          await pcsYieldStrategy.grantRole(await pcsYieldStrategy.STRATEGY_CALLER_ROLE(), ownerAddress);
 
           // MOCK masterchef storages
           await masterchef.setVariable("userInfo", {
@@ -375,7 +375,7 @@ describe("PCSYieldStrategy", () => {
         it("should not return any reward with a correct accRewardBalance", async () => {
           // mock masterchef reward for stakingToken
           const ownerAddress = await alice.getAddress();
-          await pcsYieldStrategy.grantRole(await pcsYieldStrategy.GOVERNANCE_ROLE(), ownerAddress);
+          await pcsYieldStrategy.grantRole(await pcsYieldStrategy.STRATEGY_CALLER_ROLE(), ownerAddress);
 
           // MOCK masterchef storages
           await masterchef.setVariable("userInfo", {
@@ -415,7 +415,7 @@ describe("PCSYieldStrategy", () => {
         it("should not return any reward", async () => {
           // mock masterchef reward for stakingToken
           const ownerAddress = await alice.getAddress();
-          await pcsYieldStrategy.grantRole(await pcsYieldStrategy.GOVERNANCE_ROLE(), ownerAddress);
+          await pcsYieldStrategy.grantRole(await pcsYieldStrategy.STRATEGY_CALLER_ROLE(), ownerAddress);
 
           // MOCK masterchef storages
           await masterchef.setVariable("userInfo", {
@@ -449,7 +449,7 @@ describe("PCSYieldStrategy", () => {
         it("should not return any reward", async () => {
           // mock masterchef reward for stakingToken
           const ownerAddress = await alice.getAddress();
-          await pcsYieldStrategy.grantRole(await pcsYieldStrategy.GOVERNANCE_ROLE(), ownerAddress);
+          await pcsYieldStrategy.grantRole(await pcsYieldStrategy.STRATEGY_CALLER_ROLE(), ownerAddress);
 
           // MOCK masterchef storages
           await masterchef.setVariable("userInfo", {
@@ -484,7 +484,7 @@ describe("PCSYieldStrategy", () => {
         it("should be able to harvest the reward along with calculate a correct reward debt", async () => {
           // mock masterchef reward for stakingToken
           const ownerAddress = await alice.getAddress();
-          await pcsYieldStrategy.grantRole(await pcsYieldStrategy.GOVERNANCE_ROLE(), ownerAddress);
+          await pcsYieldStrategy.grantRole(await pcsYieldStrategy.STRATEGY_CALLER_ROLE(), ownerAddress);
 
           // MOCK masterchef storages so that it can harvest
           await masterchef.setVariable("userInfo", {
@@ -536,7 +536,7 @@ describe("PCSYieldStrategy", () => {
         it("should be able to harvest the reward along with calculate a correct reward debt", async () => {
           // mock masterchef reward for stakingToken
           const ownerAddress = await alice.getAddress();
-          await pcsYieldStrategy.grantRole(await pcsYieldStrategy.GOVERNANCE_ROLE(), ownerAddress);
+          await pcsYieldStrategy.grantRole(await pcsYieldStrategy.STRATEGY_CALLER_ROLE(), ownerAddress);
 
           // MOCK masterchef storages so that it can harvest
           await masterchef.setVariable("userInfo", {
