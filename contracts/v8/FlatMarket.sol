@@ -427,6 +427,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     require(_liquidationPenalty <= 19000 && _liquidationPenalty >= 10000, "bad liquidation penalty");
     require(_liquidationTreasuryBps <= 2000 && _liquidationTreasuryBps >= 500, "bad liquidation treasury bps");
     require(marketConfig.treasury() != address(0), "bad treasury");
+    require(_users.length == _maxDebtShares.length, "invalid a user length comparing to maxDebtShares");
 
     (uint256 _sumCollateralShare, uint256 _sumDebtAmount, uint256 _sumDebtShare) = _prepareLiquidates(
       _users,
