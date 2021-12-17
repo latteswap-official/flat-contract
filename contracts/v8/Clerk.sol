@@ -45,7 +45,6 @@ contract Clerk is IClerk, OwnableUpgradeable {
   mapping(address => EnumerableSetUpgradeable.AddressSet) private tokenToMarkets;
 
   struct StrategyData {
-    uint64 strategyStartDate;
     uint64 targetBps;
     uint128 balance; // the balance of the strategy that Clerk thinks is in there
   }
@@ -350,7 +349,6 @@ contract Clerk is IClerk, OwnableUpgradeable {
       emit LogStrategyWithdraw(_token, _data.balance);
     }
     strategy[_token] = _newStrategy;
-    _data.strategyStartDate = 0;
     _data.balance = 0;
     strategyData[_token] = _data;
   }

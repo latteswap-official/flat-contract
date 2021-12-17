@@ -60,14 +60,7 @@ interface IClerk {
 
   function strategy(IERC20Upgradeable) external view returns (IStrategy);
 
-  function strategyData(IERC20Upgradeable)
-    external
-    view
-    returns (
-      uint64 strategyStartDate,
-      uint64 targetBps,
-      uint128 balance
-    );
+  function strategyData(IERC20Upgradeable) external view returns (uint64 targetBps, uint128 balance);
 
   function toAmount(
     IERC20Upgradeable token,
