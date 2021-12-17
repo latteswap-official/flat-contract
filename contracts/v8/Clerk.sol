@@ -40,7 +40,7 @@ contract Clerk is IClerk, OwnableUpgradeable {
   /// @notice market to whitelisted state for approval
   mapping(address => bool) public override whitelistedMarkets;
   /// @notice if the market has been whitelisted it will be set into tokenToMarkets
-  mapping(address => address) private tokenToMarket;
+  mapping(address => address) public tokenToMarket;
 
   struct StrategyData {
     uint64 targetBps;
