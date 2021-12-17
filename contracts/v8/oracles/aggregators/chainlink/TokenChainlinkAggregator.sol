@@ -83,7 +83,7 @@ contract TokenChainlinkAggregator is IChainlinkAggregator, OwnableUpgradeable {
     }
 
     // 1. Check token-BNB price ref
-    if (refBNB != address(0)) {
+    if (refBNB != address(0) && refBNBUSD != address(0)) {
       uint256 _refBNBDecimal = IAggregatorV3Interface(refBNB).decimals();
       uint256 _refBNBUSDDecimal = IAggregatorV3Interface(refBNBUSD).decimals();
 
