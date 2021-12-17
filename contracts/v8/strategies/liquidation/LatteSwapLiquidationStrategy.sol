@@ -28,6 +28,9 @@ contract LatteSwapLiquidationStrategy is IFlashLiquidateStrategy, OwnableUpgrade
   function initialize(IClerk _clerk, ILatteSwapRouter _router) external initializer {
     OwnableUpgradeable.__Ownable_init();
 
+    require(address(_clerk) != address(0), "LatteSwapLiquidationStrategy::initialize:: clerk cannot be address(0)");
+    require(address(_router) != address(0), "LatteSwapLiquidationStrategy::initialize:: router cannot be address(0)");
+
     clerk = _clerk;
     router = _router;
     factory = ILatteSwapFactory(router.factory());

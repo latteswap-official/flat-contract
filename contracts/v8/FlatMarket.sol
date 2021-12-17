@@ -93,6 +93,12 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     OwnableUpgradeable.__Ownable_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
+    require(address(_clerk) != address(0), "clerk cannot be address(0)");
+    require(address(_flat) != address(0), "flat cannot be address(0)");
+    require(address(_collateral) != address(0), "collateral cannot be address(0)");
+    require(address(_marketConfig) != address(0), "marketConfig cannot be address(0)");
+    require(address(_oracle) != address(0), "oracle cannot be address(0)");
+
     clerk = _clerk;
     flat = _flat;
     collateral = _collateral;

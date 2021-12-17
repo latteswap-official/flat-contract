@@ -32,6 +32,9 @@ contract TokenChainlinkAggregator is IChainlinkAggregator, OwnableUpgradeable {
   function initialize(address _wbnb, address _refBNBUSD) external initializer {
     OwnableUpgradeable.__Ownable_init();
 
+    require(_wbnb != address(0), "TokenChainlinkAggregator::initialize: wbnb cannot be address(0)");
+    require(_refBNBUSD != address(0), "TokenChainlinkAggregator::initialize: refBNBUSD cannot be address(0)");
+
     wbnb = _wbnb;
     refBNBUSD = _refBNBUSD;
   }

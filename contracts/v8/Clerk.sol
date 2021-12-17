@@ -68,6 +68,8 @@ contract Clerk is IClerk, OwnableUpgradeable {
   function initialize(address _wbnbToken) public initializer {
     OwnableUpgradeable.__Ownable_init();
 
+    require(_wbnbToken != address(0), "Clerk::initialize:: wbnb token cannot be address(0)");
+
     wbnbToken = IERC20Upgradeable(_wbnbToken);
   }
 

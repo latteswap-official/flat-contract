@@ -69,6 +69,10 @@ contract PCSYieldStrategy is IStrategy, OwnableUpgradeable, PausableUpgradeable,
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
+
+    require(address(_masterchef) != address(0), "PCSYieldStrategy::initialize:: masterchef cannot be address(0)");
+    require(address(_stakingToken) != address(0), "PCSYieldStrategy::initialize:: stakingToken cannot be address(0)");
+
     masterchef = _masterchef;
     stakingToken = _stakingToken;
     pid = _pid;

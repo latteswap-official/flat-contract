@@ -46,6 +46,8 @@ contract FlatMarketConfig is IFlatMerketConfig, OwnableUpgradeable {
   function initialize(address _treasury) external initializer {
     OwnableUpgradeable.__Ownable_init();
 
+    require(_treasury != address(0), "treasury address cannot be address(0)");
+
     treasury = _treasury;
   }
 
