@@ -48,6 +48,7 @@ contract LatteSwapYieldStrategy is IStrategy, OwnableUpgradeable, PausableUpgrad
   mapping(address => uint256) public rewardDebts;
 
   bytes32 public constant GOVERNANCE_ROLE = keccak256("GOVERNANCE_ROLE");
+  bytes32 public constant STRATEGY_CALLER_ROLE = keccak256("STRATEGY_CALLER_ROLE");
 
   event LogSkim(uint256 amount);
   event LogPause();
@@ -59,10 +60,27 @@ contract LatteSwapYieldStrategy is IStrategy, OwnableUpgradeable, PausableUpgrad
     _;
   }
 
+  modifier onlyStrategyCaller() {
+    require(
+      hasRole(STRATEGY_CALLER_ROLE, _msgSender()),
+      "LatteSwapYieldStrategy::onlyStrategyCaller::only STRATEGY CALLER role"
+    );
+    _;
+  }
+
   function initialize(IBooster _latteBooster, IERC20Upgradeable _stakingToken) external initializer {
     OwnableUpgradeable.__Ownable_init();
     PausableUpgradeable.__Pausable_init();
     AccessControlUpgradeable.__AccessControl_init();
+
+    require(
+      address(_latteBooster) != address(0),
+      "LatteSwapYieldStrategy::initialize:: latteBooster cannot be address(0)"
+    );
+    require(
+      address(_stakingToken) != address(0),
+      "LatteSwapYieldStrategy::initialize:: stakingToken cannot be address(0)"
+    );
 
     latteBooster = _latteBooster;
     stakingToken = _stakingToken;
@@ -89,7 +107,7 @@ contract LatteSwapYieldStrategy is IStrategy, OwnableUpgradeable, PausableUpgrad
   }
 
   // Send the assets to the Strategy and call skim to invest them
-  function deposit(bytes calldata _data) external override onlyGovernance whenNotPaused {
+  function deposit(bytes calldata _data) external override onlyStrategyCaller whenNotPaused {
     (uint256 _amount, address _sender, , uint256 _stake) = abi.decode(_data, (uint256, address, uint256, uint256));
     // turns amount with n decimal into WAD
     uint256 _share = (_amount * to18ConversionFactor).wdiv(WadRayMath.WAD); // [wad] convert amount of staking token with vary decimal points
@@ -107,7 +125,13 @@ contract LatteSwapYieldStrategy is IStrategy, OwnableUpgradeable, PausableUpgrad
   }
 
   // Harvest any profits made converted to the asset and pass them to the caller
-  function harvest(bytes calldata _data) public override onlyGovernance whenNotPaused returns (int256 _amountAdded) {
+  function harvest(bytes calldata _data)
+    public
+    override
+    onlyStrategyCaller
+    whenNotPaused
+    returns (int256 _amountAdded)
+  {
     (, address _sender, uint256 _totalShare, uint256 _stake) = abi.decode(_data, (uint256, address, uint256, uint256));
     _harvest(_sender, _totalShare, _stake);
     return 0;
@@ -145,7 +169,7 @@ contract LatteSwapYieldStrategy is IStrategy, OwnableUpgradeable, PausableUpgrad
   function withdraw(bytes calldata _data)
     external
     override
-    onlyGovernance
+    onlyStrategyCaller
     whenNotPaused
     returns (uint256 _actualAmount)
   {
@@ -166,7 +190,7 @@ contract LatteSwapYieldStrategy is IStrategy, OwnableUpgradeable, PausableUpgrad
   }
 
   // Withdraw all assets in the safest way possible. This shouldn't fail.
-  function exit(uint256 balance) external override onlyGovernance whenNotPaused returns (int256 _amountAdded) {
+  function exit(uint256 balance) external override onlyStrategyCaller whenNotPaused returns (int256 _amountAdded) {
     (uint256 _stakedBalance, , , ) = masterBarista.userInfo(address(stakingToken), address(this));
 
     if (_stakedBalance > 0) {
@@ -181,7 +205,7 @@ contract LatteSwapYieldStrategy is IStrategy, OwnableUpgradeable, PausableUpgrad
   }
 
   // Update is an adhoc function for a special update notified by the caller of this strategy
-  function update(bytes calldata _data) external override onlyGovernance whenNotPaused {
+  function update(bytes calldata _data) external override onlyStrategyCaller whenNotPaused {
     (address _from, address _to, uint256 _fromNewStake, uint256 _toNewStake) = abi.decode(
       _data,
       (address, address, uint256, uint256)
