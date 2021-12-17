@@ -76,12 +76,15 @@ contract LatteSwapYieldStrategy is IStrategy, OwnableUpgradeable, PausableUpgrad
   }
 
   function setTreasuryFeeBps(uint256 _treasuryFeeBps) external onlyOwner {
-    require(_treasuryFeeBps <= 5000, "LatteSwapYieldStrategy::setTreasuryFeeBps:: treasury fee bps");
+    require(_treasuryFeeBps <= 5000, "LatteSwapYieldStrategy::setTreasuryFeeBps:: treasury fee bps should be lte 5000");
     treasuryFeeBps = _treasuryFeeBps;
   }
 
   function setTreasuryAccount(address _treasuryAccount) external onlyOwner {
-    require(_treasuryAccount != address(0), "LatteSwapYieldStrategy::setTreasuryAccount:: treasury account");
+    require(
+      _treasuryAccount != address(0),
+      "LatteSwapYieldStrategy::setTreasuryAccount:: treasury account cannot be address(0)"
+    );
     treasuryAccount = _treasuryAccount;
   }
 

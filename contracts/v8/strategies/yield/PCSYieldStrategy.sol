@@ -90,12 +90,15 @@ contract PCSYieldStrategy is IStrategy, OwnableUpgradeable, PausableUpgradeable,
   }
 
   function setTreasuryFeeBps(uint256 _treasuryFeeBps) external onlyOwner {
-    require(_treasuryFeeBps <= 5000, "PCSYieldStrategy::setTreasuryFeeBps:: treasury fee bps");
+    require(_treasuryFeeBps <= 5000, "PCSYieldStrategy::setTreasuryFeeBps:: treasury fee bps should be lte 5000");
     treasuryFeeBps = _treasuryFeeBps;
   }
 
   function setTreasuryAccount(address _treasuryAccount) external onlyOwner {
-    require(_treasuryAccount != address(0), "PCSYieldStrategy::setTreasuryAccount:: treasury account");
+    require(
+      _treasuryAccount != address(0),
+      "PCSYieldStrategy::setTreasuryAccount:: treasury account cannot be address(0)"
+    );
     treasuryAccount = _treasuryAccount;
   }
 
