@@ -16,7 +16,6 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeCastUpgradeable.sol";
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
 
 import "./interfaces/IWBNB.sol";
 import "./interfaces/IStrategy.sol";
@@ -37,12 +36,11 @@ contract Clerk is IClerk, OwnableUpgradeable {
   using SafeERC20Upgradeable for IERC20Upgradeable;
   using SafeCastUpgradeable for uint256;
   using LatteConversion for Conversion;
-  using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
   /// @notice market to whitelisted state for approval
   mapping(address => bool) public override whitelistedMarkets;
   /// @notice if the market has been whitelisted it will be set into tokenToMarkets
-  mapping(address => EnumerableSetUpgradeable.AddressSet) private tokenToMarkets;
+  mapping(address => address) private tokenToMarket;
 
   struct StrategyData {
     uint64 targetBps;
@@ -75,7 +73,7 @@ contract Clerk is IClerk, OwnableUpgradeable {
 
   /// Modifier to check if the msg.sender is allowed to use funds
   modifier allowed(address _from, IERC20Upgradeable _token) {
-    if (tokenToMarkets[address(_token)].length() == 0) {
+    if (tokenToMarket[address(_token)] == address(0)) {
       if (!whitelistedMarkets[msg.sender]) {
         require(_from == msg.sender, "Clerk::allowed:: msg.sender != from");
       }
@@ -83,7 +81,7 @@ contract Clerk is IClerk, OwnableUpgradeable {
       return;
     }
     require(
-      tokenToMarkets[address(_token)].contains(msg.sender) && whitelistedMarkets[msg.sender],
+      tokenToMarket[address(_token)] == msg.sender && whitelistedMarkets[msg.sender],
       "Clerk::allowed:: invalid market"
     );
     _;
@@ -159,9 +157,9 @@ contract Clerk is IClerk, OwnableUpgradeable {
     address _collateral = address(IFlatMarket(_market).collateral());
 
     if (_approved) {
-      tokenToMarkets[_collateral].add(_market);
+      tokenToMarket[_collateral] = _market;
     } else {
-      tokenToMarkets[_collateral].remove(_market);
+      tokenToMarket[_collateral] = address(0);
     }
 
     emit LogTokenToMarkets(_market, _collateral, _approved);
