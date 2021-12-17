@@ -89,12 +89,6 @@ contract Clerk is IClerk, OwnableUpgradeable {
     _;
   }
 
-  /// @dev Returns the total balance of `token` this contracts holds,
-  /// plus the total amount this contract THINKS the strategy holds. (which is kept in strategyData)
-  function _balanceOf(IERC20Upgradeable _token) internal view returns (uint256 amount) {
-    amount = _token.balanceOf(address(this)) + (strategyData[_token].balance);
-  }
-
   function totals(IERC20Upgradeable _token) external view returns (Conversion memory) {
     return _totals[_token];
   }
