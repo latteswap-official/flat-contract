@@ -266,7 +266,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     returns (uint256 _debtShare, uint256 _share)
   {
     // 1. Borrow FLAT
-    (_debtShare, _share) = _borrow(_to, _borrowAmount);
+    (_debtShare, _share) = _borrow(msg.sender, _borrowAmount);
 
     // 2. Withdraw FLAT from Clerk to "_to"
     _vaultWithdraw(flat, _to, _borrowAmount, 0);
@@ -357,7 +357,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     _addCollateral(_to, _shareOut);
 
     // 3. Borrow FLAT
-    _borrow(_to, _borrowAmount);
+    _borrow(msg.sender, _borrowAmount);
 
     // 4. Withdraw FLAT from Vault to "_to"
     _vaultWithdraw(flat, _to, _borrowAmount, 0);
