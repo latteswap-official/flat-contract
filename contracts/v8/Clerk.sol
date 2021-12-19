@@ -150,13 +150,14 @@ contract Clerk is IClerk, OwnableUpgradeable {
   /// @notice Enables or disables a contract for approval
   function whitelistMarket(address _market, bool _approved) public override onlyOwner {
     // Checks
-    require(_market != address(0), "MasterCMgr::whitelistMarket:: Cannot approve address 0");
+    require(_market != address(0), "Clerk::whitelistMarket:: Cannot approve address 0");
 
     // Effects
     whitelistedMarkets[_market] = _approved;
     address _collateral = address(IFlatMarket(_market).collateral());
 
     if (_approved) {
+      require(tokenToMarket[_collateral] == address(0), "Clerk::whitelistMarket:: unapprove the current market first");
       tokenToMarket[_collateral] = _market;
     } else {
       tokenToMarket[_collateral] = address(0);

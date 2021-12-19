@@ -26,7 +26,7 @@ describe("TreasuryHolder", () => {
   let carol: SignerWithAddress;
   let wbnb: MockWBNB;
   let clerk: MockContract<Clerk>;
-  let stakingToken: SimpleToken;
+  let stakingTokens: Array<SimpleToken>;
   let flat: FLAT;
   let flatMarkets: Array<MockContract<MockFlatMarketForTreasuryHolder>>;
   let treasuryHolder: TreasuryHolder;
@@ -41,7 +41,7 @@ describe("TreasuryHolder", () => {
       carol,
       wbnb,
       clerk,
-      stakingToken,
+      stakingTokens,
       flat,
       treasuryHolder,
       flatMarkets,
@@ -92,14 +92,14 @@ describe("TreasuryHolder", () => {
           await clerk.whitelistMarket(flatMarkets[0].address, true);
           await clerk.whitelistMarket(flatMarkets[1].address, true);
           await fromMockContract<MockFlatMarketForTreasuryHolder>(flatMarkets[0]).mockOnBadDebtCall(parseEther("168"));
-          await fromMockContract<MockFlatMarketForTreasuryHolder>(flatMarkets[1]).mockOnBadDebtCall(parseEther("168"));
+          await fromMockContract<MockFlatMarketForTreasuryHolder>(flatMarkets[1]).mockOnBadDebtCall(parseEther("888"));
           // mock as if treasury holder have the fee in the pocket
-          await flat.approve(clerk.address, parseEther("1000"));
+          await flat.approve(clerk.address, parseEther("2000"));
           await (clerk as unknown as Clerk).deposit(
             flat.address,
             await deployer.getAddress(),
             treasuryHolder.address,
-            parseEther("1000"),
+            parseEther("2000"),
             0
           );
 
@@ -107,12 +107,12 @@ describe("TreasuryHolder", () => {
             .to.emit(treasuryHolder, "LogBadDebt")
             .withArgs(flatMarkets[0].address, parseEther("168"))
             .to.emit(treasuryHolder, "LogBadDebt")
-            .withArgs(flatMarkets[1].address, parseEther("168"));
+            .withArgs(flatMarkets[1].address, parseEther("888"));
           expect(await fromMockContract<Clerk>(clerk).balanceOf(flat.address, flatMarkets[0].address)).to.eq(
             parseEther("168")
           );
           expect(await fromMockContract<Clerk>(clerk).balanceOf(flat.address, flatMarkets[1].address)).to.eq(
-            parseEther("168")
+            parseEther("888")
           );
         });
       });

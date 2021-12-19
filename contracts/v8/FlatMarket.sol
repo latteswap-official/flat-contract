@@ -351,10 +351,10 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     uint256 _maxPrice
   ) external nonReentrant accrue updateCollateralPriceWithSlippageCheck(_minPrice, _maxPrice) checkSafe {
     // 1. Deposit collateral to the Vault
-    (, uint256 _shareOut) = _vaultDeposit(collateral, _to, _collateralAmount, 0);
+    (, uint256 _shareOut) = _vaultDeposit(collateral, msg.sender, _collateralAmount, 0);
 
     // 2. Add collateral
-    _addCollateral(_to, _shareOut);
+    _addCollateral(msg.sender, _shareOut);
 
     // 3. Borrow FLAT
     _borrow(msg.sender, _borrowAmount);

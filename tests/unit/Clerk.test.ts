@@ -949,4 +949,33 @@ describe("Clerk", () => {
       await clerk.setStrategy(stakingTokens[0].address, constants.AddressZero);
     });
   });
+
+  describe("#whitelistMarket", () => {
+    it("should return a correct whitelist market boolean and tokenToMarket", async () => {
+      for (const market of flatMarkets) {
+        await clerk.whitelistMarket(market.address, true);
+        expect(await clerk.whitelistedMarkets(market.address)).to.be.true;
+        expect(await clerk.tokenToMarket(await market.collateral())).to.equal(market.address);
+      }
+    });
+
+    context("when the token already has some market register", () => {
+      context("when a new market register to the same token", () => {
+        context("when the current registered market is still in an approval state", () => {
+          it("should revert", async () => {
+            await clerk.whitelistMarket(flatMarkets[0].address, true);
+            await expect(clerk.whitelistMarket(flatMarkets[0].address, true)).to.be.reverted;
+          });
+        });
+
+        context("when the current registered market is already unapproved", () => {
+          it("should be able to approve it", async () => {
+            await clerk.whitelistMarket(flatMarkets[0].address, true);
+            await clerk.whitelistMarket(flatMarkets[0].address, false);
+            await expect(clerk.whitelistMarket(flatMarkets[0].address, true)).not.to.be.reverted;
+          });
+        });
+      });
+    });
+  });
 });
