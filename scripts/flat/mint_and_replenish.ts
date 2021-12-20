@@ -57,8 +57,16 @@ async function main() {
       SHOULD_DIRECT_SEND: true,
       PARAM: [
         {
-          MARKET: (config as IDevelopConfig).FlatMarket["PCS_CAKE-WBNB"],
-          AMOUNT: ethers.utils.parseEther("10000000"),
+          MARKET: (config as IDevelopConfig).FlatMarket["LATTEv2-BUSD"],
+          AMOUNT: ethers.utils.parseEther("1000000"),
+        },
+        {
+          MARKET: (config as IDevelopConfig).FlatMarket["USDT-BUSD"],
+          AMOUNT: ethers.utils.parseEther("1000000"),
+        },
+        {
+          MARKET: (config as IDevelopConfig).FlatMarket["PCS_CAKE-BNB"],
+          AMOUNT: ethers.utils.parseEther("1000000"),
         },
       ],
     },
@@ -71,8 +79,8 @@ async function main() {
 
   if (PARAM.MINT.SHOULD_MINT) {
     console.log(">> Execute transaction for minting FLAT");
-    estimatedGas = await flat.estimateGas.mint(await deployer.getAddress(), PARAM.MINT.AMOUNT);
-    tx = await flat.mint(await deployer.getAddress(), PARAM.MINT.AMOUNT, {
+    estimatedGas = await flat.estimateGas.mint(flat.address, PARAM.MINT.AMOUNT);
+    tx = await flat.mint(flat.address, PARAM.MINT.AMOUNT, {
       nonce: nonce++,
       gasPrice: ethers.utils.parseUnits("20", "gwei"),
       gasLimit: estimatedGas.add(100000),

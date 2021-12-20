@@ -32,11 +32,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       // market params
       CLERK: "0xBf181131D87B2a7720d2Dd5095f9eCaA456bd735",
       FLAT: config.FLAT,
-      COLLATERAL_TOKEN: "0x0eD7e52944161450477ee417DE9Cd3a859b14fD0",
+      COLLATERAL_TOKEN: "0xDa01147B87d389d1BDB3c2dD28bf56c79BE74E3c",
       ORACLE: "0x554F4Ed695D801B2c2cceC0a9927977C264A50fb",
-      ORACLE_DATA: ethers.utils.defaultAbiCoder.encode(["address"], ["0x0eD7e52944161450477ee417DE9Cd3a859b14fD0"]),
+      ORACLE_DATA: ethers.utils.defaultAbiCoder.encode(["address"], ["0xDa01147B87d389d1BDB3c2dD28bf56c79BE74E3c"]),
       // config params
-      COLLATERAL_FACTOR: "7500",
+      COLLATERAL_FACTOR: "9000",
       LIQUIDATION_PENALTY: "10500",
       LIQUIDATION_TREASURY_BPS: "500",
       MIN_DEBT_SIZE: ethers.utils.parseEther("5"), // 5 FLAT

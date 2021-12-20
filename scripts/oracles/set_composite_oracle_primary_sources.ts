@@ -33,17 +33,13 @@ async function main() {
   const COMPOSITE_ORACLE = "0x554F4Ed695D801B2c2cceC0a9927977C264A50fb";
   const PARAMS: ISetCompositeOraclePrimarySourcesParams = [
     {
-      TOKEN: "0x0eD7e52944161450477ee417DE9Cd3a859b14fD0",
+      TOKEN: "0xDa01147B87d389d1BDB3c2dD28bf56c79BE74E3c",
       MAX_DEVIATION: ethers.utils.parseEther("1.5"),
-      ORACLE: ["0x241c377eEC3e30F7581515d28C5DF7f308408ff7", "0x8474BE3314EDD429993B4948f3c5059F124139E8"],
+      ORACLE: ["0x8474BE3314EDD429993B4948f3c5059F124139E8"],
       ORACLE_DATA: [
         ethers.utils.defaultAbiCoder.encode(
-          ["address", "address", "uint256"],
-          ["0x09cF4972912282CE6ceca6150c98a046Cac2e600", constants.AddressZero, ethers.utils.parseUnits("1", 36)]
-        ),
-        ethers.utils.defaultAbiCoder.encode(
           ["address", "address"],
-          ["0x0eD7e52944161450477ee417DE9Cd3a859b14fD0", constants.AddressZero]
+          ["0x1524C3380257eF5D556AFeB6056c35DeFA9db8b6", constants.AddressZero]
         ),
       ],
     },

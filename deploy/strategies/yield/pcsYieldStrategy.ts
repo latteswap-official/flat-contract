@@ -45,12 +45,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
     const clerk = Clerk__factory.connect(CLERK, deployer);
 
-    console.log(`>> grant role governance to CLERK`);
-    tx = await pcsYieldStrategy.grantRole(await pcsYieldStrategy.GOVERNANCE_ROLE(), CLERK, {
+    console.log(`>> grant role strategy caller to CLERK`);
+    tx = await pcsYieldStrategy.grantRole(await pcsYieldStrategy.STRATEGY_CALLER_ROLE(), CLERK, {
       gasPrice: ethers.utils.parseUnits("20", "gwei"),
       nonce: nonce++,
     });
-    console.log(`✅ Done grant role governance to CLERK ${tx.hash}`);
+    console.log(`✅ Done grant role strategy caller to CLERK ${tx.hash}`);
 
     console.log(`>> set treasury account to pcs yield strategy`);
     tx = await pcsYieldStrategy.setTreasuryAccount(TREASURY_ACCOUNT, {
