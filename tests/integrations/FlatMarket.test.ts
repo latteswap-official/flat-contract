@@ -1,5 +1,5 @@
 import { ethers, upgrades, waffle } from "hardhat";
-import { BigNumber, Signer, BigNumberish } from "ethers";
+import { BigNumber, Signer, BigNumberish, constants } from "ethers";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
 import {
@@ -13,6 +13,8 @@ import {
   FlatMarketConfig__factory,
   FlatMarket__factory,
   FLAT__factory,
+  LatteSwapYieldStrategy,
+  LatteSwapYieldStrategy__factory,
   OffChainOracle,
   OffChainOracle__factory,
   SimpleToken,
@@ -21,16 +23,27 @@ import {
   TreasuryHolder__factory,
 } from "../../typechain/v8";
 import {
+  BeanBagV2,
+  BeanBagV2__factory,
+  Booster,
+  BoosterConfig,
+  BoosterConfig__factory,
+  Booster__factory,
   LatteSwapFactory,
   LatteSwapFactory__factory,
   LatteSwapRouter,
   LatteSwapRouter__factory,
+  LATTE__factory,
+  MasterBarista,
+  MasterBarista__factory,
   MockWBNB,
   MockWBNB__factory,
+  WNativeRelayer__factory,
 } from "../../typechain/v6";
 import { FOREVER, MAX_PRICE_DEVIATION } from "../helpers/constants";
 import * as timeHelpers from "../helpers/time";
 import * as debtHelpers from "../helpers/debt";
+import { advanceBlockTo } from "../helpers/time";
 
 chai.use(solidity);
 const { expect } = chai;
@@ -733,6 +746,161 @@ describe("FlatMarket", () => {
   });
 
   describe("#depositAndAddCollateral", async () => {
+    context("integrated with booster", () => {
+      const LATTE_PER_BLOCK = ethers.utils.parseEther("1");
+      const LATTE_START_BLOCK = 0;
+      const stages: Record<string, BigNumberish> = {};
+      let masterBarista: MasterBarista, booster: Booster, latteSwapYieldStrategy: LatteSwapYieldStrategy;
+      beforeEach(async () => {
+        // Deploy LATTE
+        const LATTE = new LATTE__factory(deployer);
+        const latteToken = await LATTE.deploy(await deployer.getAddress(), 132, 137);
+        await latteToken.deployed();
+
+        // Deploy BeanBagV2
+        const BeanBagV2Factory = (await ethers.getContractFactory("BeanBagV2", deployer)) as BeanBagV2__factory;
+        const beanV2 = (await upgrades.deployProxy(BeanBagV2Factory, [latteToken.address])) as BeanBagV2;
+        await beanV2.deployed();
+
+        // Deploy MasterBarista
+        const MasterBaristaFactory = (await ethers.getContractFactory(
+          "MasterBarista",
+          deployer
+        )) as MasterBarista__factory;
+        masterBarista = (await upgrades.deployProxy(MasterBaristaFactory, [
+          latteToken.address,
+          beanV2.address,
+          await deployer.getAddress(),
+          LATTE_PER_BLOCK,
+          LATTE_START_BLOCK,
+        ])) as MasterBarista;
+        await masterBarista.deployed();
+
+        // set beanv2 owner to master barista
+        await beanV2.transferOwnership(masterBarista.address);
+        await latteToken.transferOwnership(masterBarista.address);
+
+        const BoosterConfigFactory = (await ethers.getContractFactory(
+          "BoosterConfig",
+          deployer
+        )) as BoosterConfig__factory;
+        const boosterConfig = (await upgrades.deployProxy(BoosterConfigFactory, [])) as BoosterConfig;
+        await boosterConfig.deployed();
+
+        const WBNB = await ethers.getContractFactory("MockWBNB", deployer);
+        const wbnb = await WBNB.deploy();
+        await wbnb.deployed();
+
+        const WNativeRelayer = (await ethers.getContractFactory("WNativeRelayer", deployer)) as WNativeRelayer__factory;
+        const wNativeRelayer = await WNativeRelayer.deploy(wbnb.address);
+        await await wNativeRelayer.deployed();
+
+        const BoosterFactory = (await ethers.getContractFactory("Booster", deployer)) as Booster__factory;
+        booster = (await upgrades.deployProxy(BoosterFactory, [
+          latteToken.address,
+          masterBarista.address,
+          boosterConfig.address,
+          wNativeRelayer.address,
+          wbnb.address,
+        ])) as Booster;
+        await booster.deployed();
+
+        await boosterConfig.setStakeTokenAllowance(usdcUsdtLp.address, true);
+        await masterBarista.setStakeTokenCallerAllowancePool(usdcUsdtLp.address, true);
+        await masterBarista.addStakeTokenCallerContract(usdcUsdtLp.address, booster.address);
+        await masterBarista.addPool(usdcUsdtLp.address, ethers.utils.parseEther("1"));
+        await masterBarista.setPool(latteToken.address, ethers.utils.parseEther("0"));
+
+        await wNativeRelayer.setCallerOk([booster.address], true);
+
+        const LatteSwapYieldStrategyFactory = (await ethers.getContractFactory(
+          "LatteSwapYieldStrategy",
+          deployer
+        )) as LatteSwapYieldStrategy__factory;
+        latteSwapYieldStrategy = (await upgrades.deployProxy(LatteSwapYieldStrategyFactory, [
+          booster.address,
+          usdcUsdtLp.address,
+        ])) as LatteSwapYieldStrategy;
+        await latteSwapYieldStrategy.deployed();
+        await latteSwapYieldStrategy.setTreasuryAccount(catAddress);
+
+        await clerk.setStrategy(usdcUsdtLp.address, latteSwapYieldStrategy.address);
+        await clerk.setStrategyTargetBps(usdcUsdtLp.address, 10000);
+        await latteSwapYieldStrategy.grantRole(await latteSwapYieldStrategy.STRATEGY_CALLER_ROLE(), clerk.address);
+      });
+
+      context("when multiple add collateral", async () => {
+        it("should have a correct collateral added as well as a reward and reward debt", async () => {
+          const amount = ethers.utils.parseEther("10000000");
+          const aliceBefore = await usdcUsdtLpAsAlice.balanceOf(aliceAddress);
+          //get current block
+          const block = await ethers.provider.getBlockNumber();
+          stages["aliceDepositAndAddCollateralBlock"] = block + 1;
+          await usdcUsdtLpMarket.connect(alice).depositAndAddCollateral(bobAddress, amount);
+          const aliceAfter = await usdcUsdtLpAsAlice.balanceOf(aliceAddress);
+
+          await advanceBlockTo(stages["aliceDepositAndAddCollateralBlock"] + 2);
+          stages["aliceDepositAndAddCollateralBlock"] = stages["aliceDepositAndAddCollateralBlock"] + 2;
+          let expectedAccumRewardPerShare = LATTE_PER_BLOCK.mul(constants.WeiPerEther).mul(2).div(amount);
+          let expectedReward = expectedAccumRewardPerShare.mul(amount).div(constants.WeiPerEther);
+          expect(await masterBarista.pendingLatte(usdcUsdtLp.address, latteSwapYieldStrategy.address)).to.eq(
+            expectedReward
+          );
+
+          expectedAccumRewardPerShare = expectedAccumRewardPerShare.add(
+            LATTE_PER_BLOCK.mul(constants.WeiPerEther).div(amount)
+          );
+          expectedReward = expectedAccumRewardPerShare.mul(amount).div(constants.WeiPerEther);
+          await clerk.connect(bob)["harvest(address)"](usdcUsdtLp.address);
+          stages["aliceDepositAndAddCollateralBlock"] = stages["aliceDepositAndAddCollateralBlock"] + 1;
+          expect(
+            await latteSwapYieldStrategy.rewardDebts(bobAddress),
+            "reward debts should be eq to expected reward"
+          ).to.eq(expectedReward);
+          expect(
+            await latteSwapYieldStrategy.accRewardPerShare(),
+            "acc reward pershare should be eq to expected one"
+          ).to.eq(expectedAccumRewardPerShare.mul(ethers.utils.parseUnits("1", 9)));
+
+          expect(aliceBefore.sub(aliceAfter)).to.be.eq(amount);
+          expect(await usdcUsdtLp.balanceOf(clerk.address), "move all tokens to the strategy").to.be.eq(0);
+          expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(amount);
+          expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+          expect(await usdcUsdtLpMarket.userCollateralShare(bobAddress)).to.be.eq(amount);
+
+          expectedAccumRewardPerShare = expectedAccumRewardPerShare.add(
+            LATTE_PER_BLOCK.mul(constants.WeiPerEther).div(amount)
+          );
+          expectedReward = expectedAccumRewardPerShare.mul(amount).div(constants.WeiPerEther);
+          await usdcUsdtLpMarket.connect(alice).depositAndAddCollateral(aliceAddress, amount);
+          stages["aliceDepositAndAddCollateralBlock"] = stages["aliceDepositAndAddCollateralBlock"] + 1;
+          expect(
+            await latteSwapYieldStrategy.rewardDebts(aliceAddress),
+            "reward debts should be eq to expected reward"
+          ).to.eq(expectedReward);
+          expect(
+            await latteSwapYieldStrategy.accRewardPerShare(),
+            "acc reward pershare should be eq to expected one"
+          ).to.eq(expectedAccumRewardPerShare.mul(ethers.utils.parseUnits("1", 9)));
+
+          expectedAccumRewardPerShare = expectedAccumRewardPerShare.add(
+            LATTE_PER_BLOCK.mul(constants.WeiPerEther).div(amount.add(amount))
+          );
+          expectedReward = expectedAccumRewardPerShare.mul(amount.add(amount)).div(constants.WeiPerEther);
+          await usdcUsdtLpMarket.connect(alice).depositAndAddCollateral(bobAddress, amount);
+          stages["aliceDepositAndAddCollateralBlock"] = stages["aliceDepositAndAddCollateralBlock"] + 1;
+          expect(
+            await latteSwapYieldStrategy.rewardDebts(bobAddress),
+            "reward debts should be eq to expected reward"
+          ).to.eq(expectedReward);
+          expect(
+            await latteSwapYieldStrategy.accRewardPerShare(),
+            "acc reward pershare should be eq to expected one"
+          ).to.eq(expectedAccumRewardPerShare.mul(ethers.utils.parseUnits("1", 9)));
+        });
+      });
+    });
+
     context("when msg.sender and '_to' is the same person", async () => {
       it("should take token from msg.sender and credit msg.sender", async () => {
         const amount = ethers.utils.parseEther("10000000");
@@ -973,6 +1141,45 @@ describe("FlatMarket", () => {
             expect(
               await usdcUsdtLpMarket.debtShareToValue(await usdcUsdtLpMarket.userDebtShare(aliceAddress))
             ).to.be.eq(totalDebtValue.sub(repayFunds.sub(ethers.utils.parseEther("1"))));
+          });
+        });
+
+        context("when there is 0 dust", () => {
+          it("should successfully repay", async () => {
+            const usdcUsdtLpMarketFlatBefore = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
+            const totalDebtShareBefore = await usdcUsdtLpMarket.totalDebtShare();
+
+            stages["aliceDepositAndRepay"] = [await timeHelpers.latestTimestamp()];
+            totalDebtValue = totalDebtValue.add(
+              calculateAccruedInterest(
+                stages["aliceDepositAndBorrow"][0],
+                stages["aliceDepositAndRepay"][0].add(2),
+                totalDebtValue,
+                INTEREST_PER_SECOND
+              )
+            );
+
+            const expectedAliceDebtShare = debtHelpers.debtShareToValue(
+              repayFunds,
+              totalDebtShareBefore,
+              totalDebtValue
+            );
+            const interest = expectedAliceDebtShare.sub(repayFunds);
+            await flat.mint(aliceAddress, interest);
+            stages["aliceDepositAndRepay"] = [await timeHelpers.latestTimestamp()];
+
+            await usdcUsdtLpMarketAsAlice.depositAndRepay(aliceAddress, constants.MaxUint256);
+            const usdcUsdtLpMarketFlatAfter = await clerk.balanceOf(flat.address, usdcUsdtLpMarket.address);
+
+            expect(usdcUsdtLpMarketFlatAfter.sub(usdcUsdtLpMarketFlatBefore)).to.be.eq(repayFunds.add(interest));
+            expect(await clerk.balanceOf(usdcUsdtLp.address, usdcUsdtLpMarket.address)).to.be.eq(0);
+            expect(await clerk.balanceOf(usdcUsdtLp.address, aliceAddress)).to.be.eq(collateralAmount);
+            expect(await clerk.balanceOf(usdcUsdtLp.address, bobAddress)).to.be.eq(0);
+            expect(await usdcUsdtLpMarket.totalCollateralShare()).to.be.eq(collateralAmount);
+            expect(await usdcUsdtLpMarket.userCollateralShare(aliceAddress)).to.be.eq(collateralAmount);
+            expect(
+              await usdcUsdtLpMarket.debtShareToValue(await usdcUsdtLpMarket.userDebtShare(aliceAddress))
+            ).to.be.eq(0);
           });
         });
       });
