@@ -91,36 +91,6 @@ contract Clerk is IClerk, OwnableUpgradeable {
     return _totals[_token];
   }
 
-  /// @dev wrap the token if the sent token is a native, otherwise just do safeTransferFrom
-  function _safeWrap(
-    address _from,
-    IERC20Upgradeable _token,
-    uint256 _amount
-  ) internal {
-    if (msg.value != 0) {
-      require(address(_token) == address(wbnbToken), "Clerk::_safeWrap:: baseToken is not wNative");
-      require(_amount == msg.value, "Clerk::_safeWrap:: value != msg.value");
-      IWBNB(address(wbnbToken)).deposit{ value: msg.value }();
-      return;
-    }
-    _token.safeTransferFrom(_from, address(this), _amount);
-  }
-
-  /// @dev uwrap the token if the sent token is a native, otherwise just do safeTransfer back to the _to
-  function _safeUnwrap(
-    IERC20Upgradeable _token,
-    address _to,
-    uint256 _amount
-  ) internal {
-    if (address(_token) == address(wbnbToken)) {
-      IWBNB(address(wbnbToken)).withdraw(_amount);
-      (bool _success, ) = _to.call{ value: _amount }("");
-      require(_success, "Clerk::withdraw:: BNB transfer failed");
-      return;
-    }
-    _token.safeTransfer(_to, _amount);
-  }
-
   /// @dev Helper function to represent an `amount` of `token` in shares.
   /// @param _token The ERC-20 token.
   /// @param _amount The `token` amount.
@@ -181,7 +151,7 @@ contract Clerk is IClerk, OwnableUpgradeable {
     address _to,
     uint256 _amount,
     uint256 _share
-  ) public payable override allowed(_from, _token) returns (uint256 _amountOut, uint256 _shareOut) {
+  ) public override allowed(_from, _token) returns (uint256 _amountOut, uint256 _shareOut) {
     require(address(_token) != address(0), "Clerk::deposit:: token not set");
     require(_to != address(0), "Clerk::deposit:: to not set"); // To avoid a bad UI from burning funds
     // Harvest
@@ -206,7 +176,7 @@ contract Clerk is IClerk, OwnableUpgradeable {
     _total.amount = _total.amount + _amount.toUint128();
     _totals[_token] = _total;
 
-    _safeWrap(_from, _token, _amount);
+    _token.safeTransferFrom(_from, address(this), _amount);
     // does house keeping, either deposit or withdraw
     _houseKeeping(_to, _token);
 
@@ -253,7 +223,7 @@ contract Clerk is IClerk, OwnableUpgradeable {
     // does house keeping, either deposit or withdraw
     _houseKeeping(_from, _token);
 
-    _safeUnwrap(_token, _to, _amount);
+    _token.safeTransfer(_to, _amount);
 
     emit LogWithdraw(_token, _from, _to, _amount, _share);
     _amountOut = _amount;
@@ -440,8 +410,4 @@ contract Clerk is IClerk, OwnableUpgradeable {
 
     strategyData[_token] = _data;
   }
-
-  // Contract should be able to receive BNB deposits to support deposit
-  // solhint-disable-next-line no-empty-blocks
-  receive() external payable {}
 }

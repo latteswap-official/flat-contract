@@ -48,7 +48,7 @@ interface IClerk {
     address to,
     uint256 amount,
     uint256 share
-  ) external payable returns (uint256 amountOut, uint256 shareOut);
+  ) external returns (uint256 amountOut, uint256 shareOut);
 
   function harvest(IERC20Upgradeable token) external;
 

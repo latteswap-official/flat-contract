@@ -322,35 +322,8 @@ describe("Clerk", () => {
       });
     });
 
-    it("Mutates balanceOf for Clerk and WBNB correctly", async function () {
-      await wbnb.connect(alice).deposit({ value: ethers.utils.parseEther("1") });
-      await expect(
-        clerk.connect(bob).deposit(wbnb.address, bob.address, bob.address, 1, 0, {
-          value: 1,
-        })
-      ).to.not.emit(wbnb, "Deposit");
-      await expect(
-        clerk.connect(bob).deposit(wbnb.address, bob.address, bob.address, ethers.utils.parseEther("1"), 0, {
-          value: ethers.utils.parseEther("1"),
-        })
-      )
-        .to.emit(wbnb, "Deposit")
-        .withArgs(clerkAsAlice.address, ethers.utils.parseEther("1"))
-        .to.emit(clerk, "LogDeposit")
-        .withArgs(wbnb.address, bob.address, bob.address, ethers.utils.parseEther("1"), ethers.utils.parseEther("1"));
-
-      expect(await wbnb.balanceOf(clerkAsAlice.address), "Clerk should hold WBNB").to.be.equal(
-        ethers.utils.parseEther("1")
-      );
-      expect(await clerkAsAlice.balanceOf(wbnb.address, bob.address), "bob should have WBNB").to.be.equal(
-        ethers.utils.parseEther("1")
-      );
-    });
-
     context("if totalSupply of token is Zero or the token is not a token", () => {
       it("should revert", async () => {
-        await expect(clerkAsAlice.deposit(constants.AddressZero, alice.address, alice.address, 1, 0, { value: 1 })).to
-          .be.reverted;
         await expect(clerkAsAlice.deposit(bob.address, alice.address, alice.address, 1, 0)).to.be.reverted;
       });
     });
@@ -684,47 +657,6 @@ describe("Clerk", () => {
         await clerkAsAlice.balanceOf(stakingTokens[0].address, alice.address),
         "token should be withdrawn thus balance should be 0"
       ).to.equal(0);
-    });
-
-    it("Mutates balanceOf on Clerk for WBNB correctly", async function () {
-      await wbnb.connect(alice).deposit({
-        value: 1,
-      });
-      await clerk.connect(bob).deposit(wbnb.address, bob.address, bob.address, ethers.utils.parseEther("1"), 0, {
-        from: bob.address,
-        value: ethers.utils.parseEther("1"),
-      });
-      await clerk
-        .connect(bob)
-        .withdraw(wbnb.address, bob.address, bob.address, ethers.utils.parseEther("1").sub(100000), 0, {
-          from: bob.address,
-        });
-      expect(await clerkAsAlice.balanceOf(wbnb.address, bob.address), "token should be withdrawn").to.be.equal(100000);
-    });
-    context("when BNB transfer failed", () => {
-      it("should revert", async function () {
-        await wbnb.connect(alice).deposit({
-          value: 1,
-        });
-        await clerk.connect(bob).deposit(wbnb.address, bob.address, bob.address, ethers.utils.parseEther("1"), 0, {
-          from: bob.address,
-          value: ethers.utils.parseEther("1"),
-        });
-        await expect(
-          clerk
-            .connect(bob)
-            .withdraw(
-              wbnb.address,
-              bob.address,
-              nonNativeReceivableToken.address,
-              ethers.utils.parseEther("1").sub(100000),
-              0,
-              {
-                from: bob.address,
-              }
-            )
-        ).to.be.revertedWith("Clerk::withdraw:: BNB transfer failed");
-      });
     });
 
     it("Emits LogWithdraw event with expected arguments", async function () {
