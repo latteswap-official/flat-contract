@@ -79,7 +79,7 @@ export async function clerkUnitTestFixture(
   // Deploy Clerk
   const Clerk = await smock.mock<Clerk__factory>("Clerk", deployer);
   const clerk: MockContract<Clerk> = await Clerk.deploy();
-  await clerk.initialize(wbnb.address);
+  await clerk.initialize();
 
   // Deploy FLAT
   const FLAT = (await ethers.getContractFactory("FLAT", deployer)) as FLAT__factory;
@@ -170,7 +170,7 @@ export async function clerkIntegrationTestFixture(
   // Deploy Clerk
   const Clerk = await smock.mock<Clerk__factory>("Clerk", deployer);
   const clerk: MockContract<Clerk> = await Clerk.deploy();
-  await clerk.initialize(wbnb.address);
+  await clerk.initialize();
 
   // Deploy LATTE
   const LATTE = new LATTE__factory(deployer) as LATTE__factory;

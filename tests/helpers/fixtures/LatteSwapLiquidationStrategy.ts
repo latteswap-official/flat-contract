@@ -59,7 +59,7 @@ export async function latteSwapLiquidationStrategyIntegrationTestFixture(
 
   // Deploy Clerk
   const Clerk = new Clerk__factory(deployer);
-  const clerk: Clerk = (await upgrades.deployProxy(Clerk, [wbnb.address])) as Clerk;
+  const clerk: Clerk = (await upgrades.deployProxy(Clerk, [])) as Clerk;
 
   // Deploy mocked stake tokens
   const stakingTokens = [];

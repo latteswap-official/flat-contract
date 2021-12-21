@@ -49,7 +49,7 @@ export async function flatMarketUnitTestFixture(
 
   // Deploy mocked Clerk
   const Clerk = (await ethers.getContractFactory("Clerk", deployer)) as Clerk__factory;
-  const clerk = await upgrades.deployProxy(Clerk, [mockedWBNB.address]);
+  const clerk = await upgrades.deployProxy(Clerk, []);
   await clerk.deployed();
   const mockedClerk = await smockit(clerk);
 

@@ -71,7 +71,7 @@ export async function treasuryHolderUnitTestFixture(
   // Deploy Clerk
   const Clerk = await smock.mock<Clerk__factory>("Clerk", deployer);
   const clerk: MockContract<Clerk> = await Clerk.deploy();
-  await clerk.initialize(wbnb.address);
+  await clerk.initialize();
 
   // Deploy FlatMarketConfig
   const flatMarketConfigFactory = (await ethers.getContractFactory(

@@ -17,7 +17,6 @@ import "@openzeppelin/contracts-upgradeable/utils/math/SafeCastUpgradeable.sol";
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-import "./interfaces/IWBNB.sol";
 import "./interfaces/IStrategy.sol";
 import "./interfaces/IClerk.sol";
 
@@ -47,8 +46,6 @@ contract Clerk is IClerk, OwnableUpgradeable {
     uint128 balance; // the balance of the strategy that Clerk thinks is in there
   }
 
-  IERC20Upgradeable public wbnbToken;
-
   uint256 private constant FLASH_LOAN_FEE = 50; // 0.05%
   uint256 private constant FLASH_LOAN_FEE_PRECISION = 1e5;
   uint256 private constant MAX_TARGET_BPS = 10000; // 100%
@@ -63,12 +60,8 @@ contract Clerk is IClerk, OwnableUpgradeable {
   mapping(IERC20Upgradeable => IStrategy) public override strategy;
   mapping(IERC20Upgradeable => StrategyData) public override strategyData;
 
-  function initialize(address _wbnbToken) public initializer {
+  function initialize() public initializer {
     OwnableUpgradeable.__Ownable_init();
-
-    require(_wbnbToken != address(0), "Clerk::initialize:: wbnb token cannot be address(0)");
-
-    wbnbToken = IERC20Upgradeable(_wbnbToken);
   }
 
   /// Modifier to check if the msg.sender is allowed to use funds

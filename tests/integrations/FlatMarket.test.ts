@@ -208,7 +208,7 @@ describe("FlatMarket", () => {
 
     // Deploy Clerk
     const Clerk = (await ethers.getContractFactory("Clerk", deployer)) as Clerk__factory;
-    clerk = (await upgrades.deployProxy(Clerk, [wbnb.address])) as Clerk;
+    clerk = (await upgrades.deployProxy(Clerk, [])) as Clerk;
 
     // Deploy FLAT
     const FLAT = (await ethers.getContractFactory("FLAT", deployer)) as FLAT__factory;
