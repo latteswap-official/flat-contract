@@ -15,7 +15,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
   const deployer = (await ethers.getSigners())[0];
-  const TIME_DELAY = 900;
+  const TIME_DELAY = 900; // 15 minutes
 
   await withNetworkFile(async () => {
     console.log(`deploying an Composite Oracle`);

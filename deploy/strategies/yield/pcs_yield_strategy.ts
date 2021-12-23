@@ -15,12 +15,13 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
   const deployer = (await ethers.getSigners())[0];
+  const config = getConfig();
   const PCS_MASTERCHEF = "0x73feaa1eE314F8c655E354234017bE2193C9E24E";
-  const STAKING_TOKEN = "0x0eD7e52944161450477ee417DE9Cd3a859b14fD0";
-  const PID = "251";
-  const CLERK = "0xBf181131D87B2a7720d2Dd5095f9eCaA456bd735";
-  const TREASURY_ACCOUNT = await deployer.getAddress();
-  const TREASURY_FEE_BPS = "1000";
+  const STAKING_TOKEN = "0x7EFaEf62fDdCCa950418312c6C91Aef321375A00";
+  const PID = "258";
+  const CLERK = config.Clerk;
+  const TREASURY_ACCOUNT = "0xC29d5eB3d4baBa9b23753B00b8F048ec0431E358";
+  const TREASURY_FEE_BPS = "700";
   const STRATEGY_TARGET_BPS = "10000";
 
   await withNetworkFile(async () => {
