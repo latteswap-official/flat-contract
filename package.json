@@ -1,7 +1,7 @@
 {
   "name": "@latteswap/latteswap-flat",
   "scripts": {
-    "mainnetfork": "source ./start_mainnet_fork_node.sh",
+    "mainnetfork:start": "source ./start_mainnet_fork_node.sh",
     "copy-dts-typechain": "npx copyfiles -u 1 \"typechain/**/*.d.ts\" compiled-typechain",
     "coverage": "hardhat coverage",
     "build": "tsc -p tsconfig.cjs.json && yarn copy-dts-typechain",
@@ -15,6 +15,10 @@
 
     "validate:mainnet:flatMarketBundle": "hardhat --network mainnet run --no-compile ./scripts/validate/flat_market_bundle.ts",
     "validate:mainnet:setCompositeOraclePrimarySources": "hardhat --network mainnet run --no-compile ./scripts/validate/set_composite_oracle_primary_sources.ts",
+    "validate:mainnet:flat": "hardhat --network mainnet run --no-compile ./scripts/validate/flat.ts",
+    "validate:mainnet:offchainOracle": "hardhat --network mainnet run --no-compile ./scripts/validate/flat.ts",
+    "validate:mainnet:latteswapYieldStrategy": "hardhat --network mainnet run --no-compile ./scripts/validate/latteswap_yield_strategy.ts",
+    "validate:mainnet:pcsYieldStrategy": "hardhat --network mainnet run --no-compile ./scripts/validate/pcs_yield_strategy.ts",
 
     "deploy:mainnet:offchainOracle": "hardhat --network mainnet deploy --no-compile --reset --tags DeployOffChainOracle",
     "deploy:mainnet:chainlinkOracle": "hardhat --network mainnet deploy --no-compile --reset --tags DeployChainlinkOracle",
@@ -50,16 +54,17 @@
     "test:unit:offChainOracle": "hardhat test --no-compile ./tests/unit/OffChainOracle.test.ts",
     "test:unit:treasuryHolder": "hardhat test --no-compile ./tests/unit/TreasuryHolder.test.ts",
     "mainnet": "hardhat console --network mainnet",
+    "mainnetfork:console": "hardhat console --network mainnetfork",
     "test:case": "mocha --timeout 500000 --require hardhat/register --file tests/**/* --extension ts -g",
     "prepublishOnly": "yarn compile && yarn build"
   },
-  "version": "0.1.0-rc.4",
+  "version": "0.1.0",
   "main": "index.js",
   "license": "GPL-3.0",
   "devDependencies": {
     "@eth-optimism/smock": "^1.1.10",
     "@ethersproject/bignumber": "^5.0.14",
-    "@latteswap/latteswap-contract-config": "^1.6.0-rc.11",
+    "@latteswap/latteswap-contract-config": "^1.6.0",
     "@nomiclabs/ethereumjs-vm": "^4.2.2",
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-etherscan": "^2.1.1",
