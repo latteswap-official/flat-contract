@@ -2,7 +2,13 @@ import { Timelock__factory } from "@latteswap/latteswap-contract/compiled-typech
 import { BigNumberish, constants } from "ethers";
 import { commify, formatEther } from "ethers/lib/utils";
 import { ethers, network } from "hardhat";
-import { CompositeOracle, OffChainOracle, ChainlinkOracle, OffChainOracle__factory } from "../../typechain/v8";
+import {
+  CompositeOracle,
+  OffChainOracle,
+  ChainlinkOracle,
+  OffChainOracle__factory,
+  CompositeOracle__factory,
+} from "../../typechain/v8";
 import { withNetworkFile, getConfig } from "../../utils";
 
 type IOracles = OffChainOracle | CompositeOracle | ChainlinkOracle;
@@ -32,12 +38,14 @@ async function main() {
   const deployer = (await ethers.getSigners())[0];
   const PARAMS: IGetOraclePriceParams = [
     {
-      NAME: "LatteV2-BUSD - USD OffChain Oracle",
-      ORACLE: OffChainOracle__factory.connect("0x8474BE3314EDD429993B4948f3c5059F124139E8", deployer),
-      ORACLE_DATA: ethers.utils.defaultAbiCoder.encode(
-        ["address", "address"],
-        ["0x1524C3380257eF5D556AFeB6056c35DeFA9db8b6", constants.AddressZero]
-      ),
+      NAME: "LatteV2-BUSD - USD Composite Oracle",
+      ORACLE: CompositeOracle__factory.connect("0x554F4Ed695D801B2c2cceC0a9927977C264A50fb", deployer),
+      ORACLE_DATA: ethers.utils.defaultAbiCoder.encode(["address"], ["0xDa01147B87d389d1BDB3c2dD28bf56c79BE74E3c"]),
+    },
+    {
+      NAME: "USDT - BUSD Composite Oracle",
+      ORACLE: CompositeOracle__factory.connect("0x554F4Ed695D801B2c2cceC0a9927977C264A50fb", deployer),
+      ORACLE_DATA: ethers.utils.defaultAbiCoder.encode(["address"], ["0xf180466bBbaD8883360334309f558842e4B6eE59"]),
     },
   ];
 

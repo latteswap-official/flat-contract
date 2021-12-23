@@ -15,4 +15,6 @@ interface IStrategy {
   function withdraw(bytes calldata data) external returns (uint256 _actualAmount);
 
   function exit(uint256 balance) external returns (int256 _amountAdded);
+
+  function update(bytes calldata data) external;
 }

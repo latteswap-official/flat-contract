@@ -30,6 +30,16 @@ contract LPChainlinkAggregator is IChainlinkAggregator, Initializable {
     IChainlinkAggregator _token0Oracle,
     IChainlinkAggregator _token1Oracle
   ) public initializer {
+    require(address(_pair) != address(0), "LPChainlinkAggregator::initialize: pair cannot be address(0)");
+    require(
+      address(_token0Oracle) != address(0),
+      "LPChainlinkAggregator::initialize: token0Oracle cannot be address(0)"
+    );
+    require(
+      address(_token1Oracle) != address(0),
+      "LPChainlinkAggregator::initialize: token1Oracle cannot be address(0)"
+    );
+
     pair = _pair;
     token0Oracle = _token0Oracle;
     token1Oracle = _token1Oracle;

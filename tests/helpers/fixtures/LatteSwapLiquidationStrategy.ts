@@ -1,4 +1,4 @@
-import { MockContract, smock } from "@defi-wonderland/smock";
+import { FakeContract, MockContract, smock } from "@defi-wonderland/smock";
 import { ethers, upgrades } from "hardhat";
 import {
   Clerk__factory,
@@ -7,8 +7,12 @@ import {
   SimpleToken__factory,
   LatteSwapLiquidationStrategy__factory,
   LatteSwapLiquidationStrategy,
+  MockFlatMarketForLatteSwapLiquidationStrategy,
+  CompositeOracle__factory,
+  FlatMarketConfig__factory,
+  MockFlatMarketForLatteSwapLiquidationStrategy__factory,
 } from "../../../typechain/v8";
-import { BigNumber, constants, Wallet } from "ethers";
+import { BaseContract, BigNumber, constants, Wallet } from "ethers";
 import { MockProvider } from "ethereum-waffle";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { MockWBNB__factory } from "@latteswap/latteswap-contract/compiled-typechain";
@@ -34,6 +38,9 @@ export interface ILatteSwapLiquidationStrategyDTO {
   reserve0: BigNumber;
   reserve1: BigNumber;
   reserveFlat: BigNumber;
+  flatMarket: MockFlatMarketForLatteSwapLiquidationStrategy;
+  flatMarketConfig: FakeContract<BaseContract>;
+  compositeOracle: FakeContract<BaseContract>;
 }
 
 export async function latteSwapLiquidationStrategyIntegrationTestFixture(
@@ -52,7 +59,7 @@ export async function latteSwapLiquidationStrategyIntegrationTestFixture(
 
   // Deploy Clerk
   const Clerk = new Clerk__factory(deployer);
-  const clerk: Clerk = (await upgrades.deployProxy(Clerk, [wbnb.address])) as Clerk;
+  const clerk: Clerk = (await upgrades.deployProxy(Clerk, [])) as Clerk;
 
   // Deploy mocked stake tokens
   const stakingTokens = [];
@@ -119,6 +126,32 @@ export async function latteSwapLiquidationStrategyIntegrationTestFixture(
     deployer
   ) as LatteSwapPair;
 
+  // Deploy FlatMarketConfig
+  const flatMarketConfigFactory = (await ethers.getContractFactory(
+    "FlatMarketConfig",
+    deployer
+  )) as FlatMarketConfig__factory;
+  const mockedFlatMarketConfig = await smock.fake(flatMarketConfigFactory);
+
+  // Deploy mocked composite oracle
+  const CompositeOracle = (await ethers.getContractFactory("CompositeOracle", deployer)) as CompositeOracle__factory;
+  const mockedCompositeOracle = await smock.fake(CompositeOracle);
+
+  // Deploy FlatMarket
+  const FlatMarket = (await ethers.getContractFactory(
+    "MockFlatMarketForLatteSwapLiquidationStrategy",
+    deployer
+  )) as MockFlatMarketForLatteSwapLiquidationStrategy__factory;
+  const flatMarket = await FlatMarket.deploy();
+  await flatMarket.initialize(
+    clerk.address,
+    flat.address,
+    lp.address,
+    mockedFlatMarketConfig.address,
+    mockedCompositeOracle.address,
+    ethers.utils.defaultAbiCoder.encode(["address"], [constants.AddressZero])
+  );
+
   const LatteSwapLiquidationStrategy = (await ethers.getContractFactory(
     "LatteSwapLiquidationStrategy",
     deployer
@@ -128,8 +161,6 @@ export async function latteSwapLiquidationStrategyIntegrationTestFixture(
     router.address,
   ])) as LatteSwapLiquidationStrategy;
   await latteSwapLiquidationStrategy.deployed();
-
-  await clerk.whitelistMarket(latteSwapLiquidationStrategy.address, true);
 
   return {
     latteSwapLiquidationStrategy,
@@ -144,5 +175,8 @@ export async function latteSwapLiquidationStrategyIntegrationTestFixture(
     reserve0,
     reserve1,
     reserveFlat,
+    flatMarket,
+    flatMarketConfig: mockedFlatMarketConfig,
+    compositeOracle: mockedCompositeOracle,
   };
 }

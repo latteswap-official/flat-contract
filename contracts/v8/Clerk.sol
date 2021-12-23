@@ -17,9 +17,10 @@ import "@openzeppelin/contracts-upgradeable/utils/math/SafeCastUpgradeable.sol";
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-import "./interfaces/IWBNB.sol";
 import "./interfaces/IStrategy.sol";
 import "./interfaces/IClerk.sol";
+
+import "./interfaces/IFlatMarket.sol";
 
 import "./libraries/LatteConversion.sol";
 
@@ -37,13 +38,13 @@ contract Clerk is IClerk, OwnableUpgradeable {
 
   /// @notice market to whitelisted state for approval
   mapping(address => bool) public override whitelistedMarkets;
+  /// @notice if the market has been whitelisted it will be set into tokenToMarkets
+  mapping(address => address) public tokenToMarket;
+
   struct StrategyData {
-    uint64 strategyStartDate;
     uint64 targetBps;
     uint128 balance; // the balance of the strategy that Clerk thinks is in there
   }
-
-  IERC20Upgradeable public wbnbToken;
 
   uint256 private constant FLASH_LOAN_FEE = 50; // 0.05%
   uint256 private constant FLASH_LOAN_FEE_PRECISION = 1e5;
@@ -59,60 +60,28 @@ contract Clerk is IClerk, OwnableUpgradeable {
   mapping(IERC20Upgradeable => IStrategy) public override strategy;
   mapping(IERC20Upgradeable => StrategyData) public override strategyData;
 
-  function initialize(address _wbnbToken) public initializer {
+  function initialize() public initializer {
     OwnableUpgradeable.__Ownable_init();
-
-    wbnbToken = IERC20Upgradeable(_wbnbToken);
   }
 
-  /// Modifier to check if the msg.sender is allowed to use funds belonging to the 'from' address.
-  /// If 'from' is msg.sender, it's allowed.
-  /// If 'from' is a whitelisted market, it would be allowed as well.
-  modifier allowed(address _from) {
-    if (_from != msg.sender) {
-      require(whitelistedMarkets[msg.sender], "Clerk::allowed:: invalid market");
+  /// Modifier to check if the msg.sender is allowed to use funds
+  modifier allowed(address _from, IERC20Upgradeable _token) {
+    if (tokenToMarket[address(_token)] == address(0)) {
+      if (!whitelistedMarkets[msg.sender]) {
+        require(_from == msg.sender, "Clerk::allowed:: msg.sender != from");
+      }
+      _;
+      return;
     }
+    require(
+      tokenToMarket[address(_token)] == msg.sender && whitelistedMarkets[msg.sender],
+      "Clerk::allowed:: invalid market"
+    );
     _;
-  }
-
-  /// @dev Returns the total balance of `token` this contracts holds,
-  /// plus the total amount this contract THINKS the strategy holds. (which is kept in strategyData)
-  function _balanceOf(IERC20Upgradeable _token) internal view returns (uint256 amount) {
-    amount = _token.balanceOf(address(this)) + (strategyData[_token].balance);
   }
 
   function totals(IERC20Upgradeable _token) external view returns (Conversion memory) {
     return _totals[_token];
-  }
-
-  /// @dev wrap the token if the sent token is a native, otherwise just do safeTransferFrom
-  function _safeWrap(
-    address _from,
-    IERC20Upgradeable _token,
-    uint256 _amount
-  ) internal {
-    if (msg.value != 0) {
-      require(address(_token) == address(wbnbToken), "Clerk::_safeWrap:: baseToken is not wNative");
-      require(_amount == msg.value, "Clerk::_safeWrap:: value != msg.value");
-      IWBNB(address(wbnbToken)).deposit{ value: msg.value }();
-      return;
-    }
-    _token.safeTransferFrom(_from, address(this), _amount);
-  }
-
-  /// @dev uwrap the token if the sent token is a native, otherwise just do safeTransfer back to the _to
-  function _safeUnwrap(
-    IERC20Upgradeable _token,
-    address _to,
-    uint256 _amount
-  ) internal {
-    if (address(_token) == address(wbnbToken)) {
-      IWBNB(address(wbnbToken)).withdraw(_amount);
-      (bool _success, ) = _to.call{ value: _amount }("");
-      require(_success, "Clerk::withdraw:: BNB transfer failed");
-      return;
-    }
-    _token.safeTransfer(_to, _amount);
   }
 
   /// @dev Helper function to represent an `amount` of `token` in shares.
@@ -142,13 +111,23 @@ contract Clerk is IClerk, OwnableUpgradeable {
   }
 
   /// @notice Enables or disables a contract for approval
-  function whitelistMarket(address market, bool approved) public override onlyOwner {
+  function whitelistMarket(address _market, bool _approved) public override onlyOwner {
     // Checks
-    require(market != address(0), "MasterCMgr::whitelistMarket:: Cannot approve address 0");
+    require(_market != address(0), "Clerk::whitelistMarket:: Cannot approve address 0");
 
     // Effects
-    whitelistedMarkets[market] = approved;
-    emit LogWhiteListMarket(market, approved);
+    whitelistedMarkets[_market] = _approved;
+    address _collateral = address(IFlatMarket(_market).collateral());
+
+    if (_approved) {
+      require(tokenToMarket[_collateral] == address(0), "Clerk::whitelistMarket:: unapprove the current market first");
+      tokenToMarket[_collateral] = _market;
+    } else {
+      tokenToMarket[_collateral] = address(0);
+    }
+
+    emit LogTokenToMarkets(_market, _collateral, _approved);
+    emit LogWhiteListMarket(_market, _approved);
   }
 
   /// @notice Deposit an amount of `token` represented in either `amount` or `share`.
@@ -165,7 +144,7 @@ contract Clerk is IClerk, OwnableUpgradeable {
     address _to,
     uint256 _amount,
     uint256 _share
-  ) public payable override allowed(_from) returns (uint256 _amountOut, uint256 _shareOut) {
+  ) public override allowed(_from, _token) returns (uint256 _amountOut, uint256 _shareOut) {
     require(address(_token) != address(0), "Clerk::deposit:: token not set");
     require(_to != address(0), "Clerk::deposit:: to not set"); // To avoid a bad UI from burning funds
     // Harvest
@@ -190,7 +169,7 @@ contract Clerk is IClerk, OwnableUpgradeable {
     _total.amount = _total.amount + _amount.toUint128();
     _totals[_token] = _total;
 
-    _safeWrap(_from, _token, _amount);
+    _token.safeTransferFrom(_from, address(this), _amount);
     // does house keeping, either deposit or withdraw
     _houseKeeping(_to, _token);
 
@@ -211,7 +190,7 @@ contract Clerk is IClerk, OwnableUpgradeable {
     address _to,
     uint256 _amount,
     uint256 _share
-  ) public override allowed(_from) returns (uint256 _amountOut, uint256 _shareOut) {
+  ) public override allowed(_from, _token) returns (uint256 _amountOut, uint256 _shareOut) {
     require(address(_token) != address(0), "Clerk::withdraw:: token not set");
     require(_to != address(0), "Clerk::withdraw:: to not set"); // To avoid a bad UI from burning funds
 
@@ -237,7 +216,7 @@ contract Clerk is IClerk, OwnableUpgradeable {
     // does house keeping, either deposit or withdraw
     _houseKeeping(_from, _token);
 
-    _safeUnwrap(_token, _to, _amount);
+    _token.safeTransfer(_to, _amount);
 
     emit LogWithdraw(_token, _from, _to, _amount, _share);
     _amountOut = _amount;
@@ -254,7 +233,7 @@ contract Clerk is IClerk, OwnableUpgradeable {
     address _from,
     address _to,
     uint256 _share
-  ) public override allowed(_from) {
+  ) public override allowed(_from, _token) {
     require(_to != address(0), "Clerk::transfer:: to not set"); // To avoid a bad UI from burning funds
 
     // Harvest reward (if any) for _from and _to
@@ -263,6 +242,8 @@ contract Clerk is IClerk, OwnableUpgradeable {
 
     balanceOf[_token][_from] = balanceOf[_token][_from] - _share;
     balanceOf[_token][_to] = balanceOf[_token][_to] + _share;
+
+    _internalTransferUpdate(_token, _from, _to, balanceOf[_token][_from], balanceOf[_token][_to]);
 
     emit LogTransfer(_token, _from, _to, _share);
   }
@@ -277,7 +258,7 @@ contract Clerk is IClerk, OwnableUpgradeable {
     address _from,
     address[] calldata _tos,
     uint256[] calldata _shares
-  ) public override allowed(_from) {
+  ) public override allowed(_from, _token) {
     require(_tos[0] != address(0), "Clerk::transferMultiple:: to[0] not set"); // To avoid a bad UI from burning funds
 
     uint256 _totalAmount;
@@ -326,7 +307,6 @@ contract Clerk is IClerk, OwnableUpgradeable {
       emit LogStrategyWithdraw(_token, _data.balance);
     }
     strategy[_token] = _newStrategy;
-    _data.strategyStartDate = 0;
     _data.balance = 0;
     strategyData[_token] = _data;
   }
@@ -376,6 +356,20 @@ contract Clerk is IClerk, OwnableUpgradeable {
     strategyData[_token] = _data;
   }
 
+  /// @dev when transfer occurs, call the strategy to notify the update, in case that the yield strategy requires an update during a balance change
+  function _internalTransferUpdate(
+    IERC20Upgradeable _token,
+    address _from,
+    address _to,
+    uint256 _fromNewBalance,
+    uint256 _toNewBalance
+  ) internal {
+    IStrategy _strategy = strategy[_token];
+
+    if (address(_strategy) == address(0)) return;
+    _strategy.update(abi.encode(_from, _to, _fromNewBalance, _toNewBalance));
+  }
+
   /// @dev function to either invest or withdraw from a strategy depending on a different of targetBalance and strategy balance
   function _houseKeeping(address _sender, IERC20Upgradeable _token) internal {
     StrategyData memory _data = strategyData[_token];
@@ -409,8 +403,4 @@ contract Clerk is IClerk, OwnableUpgradeable {
 
     strategyData[_token] = _data;
   }
-
-  // Contract should be able to receive BNB deposits to support deposit
-  // solhint-disable-next-line no-empty-blocks
-  receive() external payable {}
 }

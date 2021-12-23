@@ -33,7 +33,7 @@ describe("FLAT", async () => {
     wbnb = await MockWBNB.deploy();
 
     const Clerk = (await ethers.getContractFactory("Clerk")) as Clerk__factory;
-    clerk = (await upgrades.deployProxy(Clerk, [wbnb.address])) as Clerk;
+    clerk = (await upgrades.deployProxy(Clerk, [])) as Clerk;
 
     const FLAT = (await ethers.getContractFactory("FLAT")) as FLAT__factory;
     flat = (await upgrades.deployProxy(FLAT, [MINT_RANGE, MAX_MINT_BPS])) as FLAT;

@@ -29,7 +29,7 @@ export type ITreasuryHolderUnitDTO = {
   carol: SignerWithAddress;
   wbnb: MockWBNB;
   clerk: MockContract<Clerk>;
-  stakingToken: SimpleToken;
+  stakingTokens: Array<SimpleToken>;
   flat: FLAT;
   flatMarkets: Array<MockContract<MockFlatMarketForTreasuryHolder>>;
   treasuryHolder: TreasuryHolder;
@@ -71,16 +71,7 @@ export async function treasuryHolderUnitTestFixture(
   // Deploy Clerk
   const Clerk = await smock.mock<Clerk__factory>("Clerk", deployer);
   const clerk: MockContract<Clerk> = await Clerk.deploy();
-  await clerk.initialize(wbnb.address);
-
-  // Deploy mocked stake tokens
-  const SimpleToken = (await ethers.getContractFactory("SimpleToken", deployer)) as SimpleToken__factory;
-  const simpleToken = (await SimpleToken.deploy()) as SimpleToken;
-  await simpleToken.deployed();
-  await simpleToken.mint(deployer.address, ethers.utils.parseEther("1000000000"));
-  await simpleToken.mint(alice.address, ethers.utils.parseEther("1000000000"));
-  await simpleToken.mint(bob.address, ethers.utils.parseEther("1000000000"));
-  await simpleToken.mint(carol.address, ethers.utils.parseEther("1000000000"));
+  await clerk.initialize();
 
   // Deploy FlatMarketConfig
   const flatMarketConfigFactory = (await ethers.getContractFactory(
@@ -96,7 +87,17 @@ export async function treasuryHolderUnitTestFixture(
   // Deploy FlatMarket
   const FlatMarket = await smock.mock<MockFlatMarketForTreasuryHolder__factory>("MockFlatMarketForTreasuryHolder");
   const flatMarkets = [];
+  const simpleTokens = [];
   for (let i = 0; i < 2; i++) {
+    const SimpleToken = (await ethers.getContractFactory("SimpleToken", deployer)) as SimpleToken__factory;
+    const simpleToken = (await SimpleToken.deploy()) as SimpleToken;
+    await simpleToken.deployed();
+    await simpleToken.mint(deployer.address, ethers.utils.parseEther("1000000000"));
+    await simpleToken.mint(alice.address, ethers.utils.parseEther("1000000000"));
+    await simpleToken.mint(bob.address, ethers.utils.parseEther("1000000000"));
+    await simpleToken.mint(carol.address, ethers.utils.parseEther("1000000000"));
+    simpleTokens.push(simpleToken);
+
     const flatMarket = await FlatMarket.deploy();
     await flatMarket.initialize(
       clerk.address,
@@ -122,7 +123,7 @@ export async function treasuryHolderUnitTestFixture(
     carol,
     wbnb,
     clerk,
-    stakingToken: simpleToken,
+    stakingTokens: simpleTokens,
     flat,
     treasuryHolder,
     flatMarkets,

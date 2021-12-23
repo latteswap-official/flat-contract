@@ -1,5 +1,5 @@
 import { MockProvider } from "ethereum-waffle";
-import { Wallet } from "ethers";
+import { constants, Wallet } from "ethers";
 import { ethers, upgrades } from "hardhat";
 import {
   Clerk__factory,
@@ -13,11 +13,18 @@ import {
   MockMasterBaristaForLatteSwapYield,
   MockMasterBaristaForLatteSwapYield__factory,
   NonNativeReceivableToken,
+  CompositeOracle__factory,
+  FlatMarketConfig__factory,
+  FlatMarket__factory,
+  FlatMarket,
+  FLAT__factory,
+  FLAT,
 } from "../../../typechain/v8";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { MockContract, smock } from "@defi-wonderland/smock";
 import { LATTE, LATTE__factory, MockWBNB, MockWBNB__factory } from "@latteswap/latteswap-contract/compiled-typechain";
 import { NonNativeReceivableToken__factory } from "../../../typechain/v8/factories/NonNativeReceivableToken__factory";
+import { smockit } from "@eth-optimism/smock";
 
 export type IClerkUnitDTO = {
   deployer: SignerWithAddress;
@@ -28,6 +35,7 @@ export type IClerkUnitDTO = {
   clerk: MockContract<Clerk>;
   stakingTokens: Array<SimpleToken>;
   nonNativeReceivableToken: NonNativeReceivableToken;
+  flatMarkets: Array<FlatMarket>;
 };
 
 export type IClerkIntegrationDTO = {
@@ -71,7 +79,25 @@ export async function clerkUnitTestFixture(
   // Deploy Clerk
   const Clerk = await smock.mock<Clerk__factory>("Clerk", deployer);
   const clerk: MockContract<Clerk> = await Clerk.deploy();
-  await clerk.initialize(wbnb.address);
+  await clerk.initialize();
+
+  // Deploy FLAT
+  const FLAT = (await ethers.getContractFactory("FLAT", deployer)) as FLAT__factory;
+  const flat = (await upgrades.deployProxy(FLAT, [24 * 60 * 60, 1500])) as FLAT;
+  await flat.deployed();
+  const mockedFlat = await smockit(flat);
+
+  // Deploy FlatMarketConfig
+  const FlatMarketConfig = (await ethers.getContractFactory("FlatMarketConfig", deployer)) as FlatMarketConfig__factory;
+  const flatMarketConfig = await upgrades.deployProxy(FlatMarketConfig, [deployer.address]);
+  await flatMarketConfig.deployed();
+  const mockedFlatMarketConfig = await smockit(flatMarketConfig);
+
+  // Deploy mocked composit oracle
+  const CompositeOracle = (await ethers.getContractFactory("CompositeOracle", deployer)) as CompositeOracle__factory;
+  const compositeOracle = await upgrades.deployProxy(CompositeOracle, [15 * 60]);
+  await compositeOracle.deployed();
+  const mockedCompositeOracle = await smockit(compositeOracle);
 
   // Deploy mocked stake tokens
   const stakingTokens = [];
@@ -86,6 +112,22 @@ export async function clerkUnitTestFixture(
     stakingTokens.push(simpleToken);
   }
 
+  // Deploy FlatMarket
+  const flatMarkets = [];
+  for (let i = 0; i < 4; i++) {
+    const FlatMarket = (await ethers.getContractFactory("FlatMarket", deployer)) as FlatMarket__factory;
+    const flatMarket = await upgrades.deployProxy(FlatMarket, [
+      clerk.address,
+      mockedFlat.address,
+      stakingTokens[i].address,
+      mockedFlatMarketConfig.address,
+      mockedCompositeOracle.address,
+      ethers.utils.defaultAbiCoder.encode(["address"], [constants.AddressZero]),
+    ]);
+    await flatMarket.deployed();
+    flatMarkets.push(flatMarket);
+  }
+
   const nonNativeReceivableTokenFactory = new NonNativeReceivableToken__factory(deployer);
   const nonNativeReceivableToken = (await nonNativeReceivableTokenFactory.deploy()) as NonNativeReceivableToken;
   return {
@@ -97,6 +139,7 @@ export async function clerkUnitTestFixture(
     clerk,
     stakingTokens,
     nonNativeReceivableToken,
+    flatMarkets,
   } as IClerkUnitDTO;
 }
 
@@ -127,7 +170,7 @@ export async function clerkIntegrationTestFixture(
   // Deploy Clerk
   const Clerk = await smock.mock<Clerk__factory>("Clerk", deployer);
   const clerk: MockContract<Clerk> = await Clerk.deploy();
-  await clerk.initialize(wbnb.address);
+  await clerk.initialize();
 
   // Deploy LATTE
   const LATTE = new LATTE__factory(deployer) as LATTE__factory;
@@ -177,7 +220,7 @@ export async function clerkIntegrationTestFixture(
   await clerk.setStrategy(stakingToken.address, latteSwapPoolStrategy.address);
   await clerk.setStrategyTargetBps(stakingToken.address, 10000);
   await latteSwapPoolStrategy.setTreasuryAccount(await deployer.getAddress());
-  await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.GOVERNANCE_ROLE(), clerk.address);
+  await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.STRATEGY_CALLER_ROLE(), clerk.address);
 
   return {
     deployer,

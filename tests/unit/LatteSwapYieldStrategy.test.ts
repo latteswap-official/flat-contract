@@ -67,7 +67,7 @@ describe("LatteSwapYieldStrategy", () => {
     context("with some rewards to be harvest", () => {
       it("should successfully stake to MasterBarista with reward debt", async () => {
         const ownerAddress = await alice.getAddress();
-        await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.GOVERNANCE_ROLE(), ownerAddress);
+        await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.STRATEGY_CALLER_ROLE(), ownerAddress);
 
         // MOCK master barista storages so that it can harvest
         await masterBarista.setVariable("userInfo", {
@@ -156,7 +156,7 @@ describe("LatteSwapYieldStrategy", () => {
     context("without rewards to be harvested", () => {
       it("should successfully stake to MasterBarista", async () => {
         const ownerAddress = await alice.getAddress();
-        await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.GOVERNANCE_ROLE(), ownerAddress);
+        await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.STRATEGY_CALLER_ROLE(), ownerAddress);
 
         // MOCK master barista storages so that it can harvest
         await masterBarista.setVariable("userInfo", {
@@ -241,7 +241,7 @@ describe("LatteSwapYieldStrategy", () => {
       it("should be able to withdraw the reward", async () => {
         // mock master barista reward for stakingToken
         const ownerAddress = await alice.getAddress();
-        await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.GOVERNANCE_ROLE(), ownerAddress);
+        await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.STRATEGY_CALLER_ROLE(), ownerAddress);
 
         // MOCK master barista storages
         await masterBarista.setVariable("userInfo", {
@@ -316,7 +316,7 @@ describe("LatteSwapYieldStrategy", () => {
       it("should successfully withdraw the reward", async () => {
         // mock master barista reward for stakingToken
         const ownerAddress = await alice.getAddress();
-        await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.GOVERNANCE_ROLE(), ownerAddress);
+        await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.STRATEGY_CALLER_ROLE(), ownerAddress);
 
         // MOCK master barista storages
         await masterBarista.setVariable("userInfo", {
@@ -374,7 +374,7 @@ describe("LatteSwapYieldStrategy", () => {
         it("should not return any reward with a correct accRewardBalance", async () => {
           // mock master barista reward for stakingToken
           const ownerAddress = await alice.getAddress();
-          await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.GOVERNANCE_ROLE(), ownerAddress);
+          await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.STRATEGY_CALLER_ROLE(), ownerAddress);
 
           // MOCK master barista storages
           await masterBarista.setVariable("userInfo", {
@@ -418,7 +418,7 @@ describe("LatteSwapYieldStrategy", () => {
         it("should not return any reward with a correct accRewardBalance", async () => {
           // mock master barista reward for stakingToken
           const ownerAddress = await alice.getAddress();
-          await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.GOVERNANCE_ROLE(), ownerAddress);
+          await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.STRATEGY_CALLER_ROLE(), ownerAddress);
 
           // MOCK master barista storages
           await masterBarista.setVariable("userInfo", {
@@ -458,7 +458,7 @@ describe("LatteSwapYieldStrategy", () => {
         it("should not return any reward", async () => {
           // mock master barista reward for stakingToken
           const ownerAddress = await alice.getAddress();
-          await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.GOVERNANCE_ROLE(), ownerAddress);
+          await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.STRATEGY_CALLER_ROLE(), ownerAddress);
 
           // MOCK master barista storages
           await masterBarista.setVariable("userInfo", {
@@ -492,7 +492,7 @@ describe("LatteSwapYieldStrategy", () => {
         it("should not return any reward", async () => {
           // mock master barista reward for stakingToken
           const ownerAddress = await alice.getAddress();
-          await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.GOVERNANCE_ROLE(), ownerAddress);
+          await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.STRATEGY_CALLER_ROLE(), ownerAddress);
 
           // MOCK master barista storages
           await masterBarista.setVariable("userInfo", {
@@ -527,7 +527,7 @@ describe("LatteSwapYieldStrategy", () => {
         it("should be able to harvest the reward along with calculate a correct reward debt", async () => {
           // mock master barista reward for stakingToken
           const ownerAddress = await alice.getAddress();
-          await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.GOVERNANCE_ROLE(), ownerAddress);
+          await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.STRATEGY_CALLER_ROLE(), ownerAddress);
 
           // MOCK master barista storages so that it can harvest
           await masterBarista.setVariable("userInfo", {
@@ -583,7 +583,7 @@ describe("LatteSwapYieldStrategy", () => {
         it("should be able to harvest the reward along with calculate a correct reward debt", async () => {
           // mock master barista reward for stakingToken
           const ownerAddress = await alice.getAddress();
-          await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.GOVERNANCE_ROLE(), ownerAddress);
+          await latteSwapPoolStrategy.grantRole(await latteSwapPoolStrategy.STRATEGY_CALLER_ROLE(), ownerAddress);
 
           // MOCK master barista storages so that it can harvest
           await masterBarista.setVariable("userInfo", {

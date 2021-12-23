@@ -18,7 +18,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const PCS_MASTERCHEF = "0x73feaa1eE314F8c655E354234017bE2193C9E24E";
   const STAKING_TOKEN = "0x0eD7e52944161450477ee417DE9Cd3a859b14fD0";
   const PID = "251";
-  const CLERK = "0x140616edc7A9262788AB5c4D43a013D970de295B";
+  const CLERK = "0xBf181131D87B2a7720d2Dd5095f9eCaA456bd735";
   const TREASURY_ACCOUNT = await deployer.getAddress();
   const TREASURY_FEE_BPS = "1000";
   const STRATEGY_TARGET_BPS = "10000";
@@ -45,12 +45,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
     const clerk = Clerk__factory.connect(CLERK, deployer);
 
-    console.log(`>> grant role governance to CLERK`);
-    tx = await pcsYieldStrategy.grantRole(await pcsYieldStrategy.GOVERNANCE_ROLE(), CLERK, {
+    console.log(`>> grant role strategy caller to CLERK`);
+    tx = await pcsYieldStrategy.grantRole(await pcsYieldStrategy.STRATEGY_CALLER_ROLE(), CLERK, {
       gasPrice: ethers.utils.parseUnits("20", "gwei"),
       nonce: nonce++,
     });
-    console.log(`✅ Done grant role governance to CLERK ${tx.hash}`);
+    console.log(`✅ Done grant role strategy caller to CLERK ${tx.hash}`);
 
     console.log(`>> set treasury account to pcs yield strategy`);
     tx = await pcsYieldStrategy.setTreasuryAccount(TREASURY_ACCOUNT, {

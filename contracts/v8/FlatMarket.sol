@@ -93,6 +93,12 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     OwnableUpgradeable.__Ownable_init();
     ReentrancyGuardUpgradeable.__ReentrancyGuard_init();
 
+    require(address(_clerk) != address(0), "clerk cannot be address(0)");
+    require(address(_flat) != address(0), "flat cannot be address(0)");
+    require(address(_collateral) != address(0), "collateral cannot be address(0)");
+    require(address(_marketConfig) != address(0), "marketConfig cannot be address(0)");
+    require(address(_oracle) != address(0), "oracle cannot be address(0)");
+
     clerk = _clerk;
     flat = _flat;
     collateral = _collateral;
@@ -138,6 +144,16 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     _;
   }
 
+  /// @notice check debt size after an execution
+  modifier checkDebtSize() {
+    _;
+    if (debtShareToValue(userDebtShare[msg.sender]) == 0) return;
+    require(
+      debtShareToValue(userDebtShare[msg.sender]) >= marketConfig.minDebtSize(address(this)),
+      "invalid debt size"
+    );
+  }
+
   /// @notice Update oracle
   function setOracle(IOracle _oracle, bytes calldata _data) external onlyOwner {
     require(address(oracle) != address(0), "oracle cannot be address 0");
@@ -152,11 +168,16 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   /// @param _to The address of the user to get the collateral added
   /// @param _share The share of the collateral to be added
   function _addCollateral(address _to, uint256 _share) internal {
+    require(
+      clerk.balanceOf(collateral, msg.sender) - userCollateralShare[msg.sender] >= _share,
+      "not enough balance to add collateral"
+    );
+
     userCollateralShare[_to] = userCollateralShare[_to] + _share;
     uint256 _oldTotalCollateralShare = totalCollateralShare;
     totalCollateralShare = _oldTotalCollateralShare + _share;
 
-    _addTokens(collateral, _share);
+    _addTokens(collateral, _to, _share);
 
     emit LogAddCollateral(msg.sender, _to, _share);
   }
@@ -169,19 +190,24 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     _addCollateral(_to, _share);
   }
 
-  /// @dev Perform token transfer from msg.sender to Market.
+  /// @dev Perform token transfer from msg.sender to _to.
   /// @param _token The BEP20 token.
+  /// @param _to The receiver of the tokens.
   /// @param _share The amount in shares to add.
   /// False if tokens from msg.sender in `flatVault` should be transferred.
-  function _addTokens(IERC20Upgradeable _token, uint256 _share) internal {
-    clerk.transfer(_token, msg.sender, address(this), _share);
+  function _addTokens(
+    IERC20Upgradeable _token,
+    address _to,
+    uint256 _share
+  ) internal {
+    clerk.transfer(_token, msg.sender, address(_to), _share);
   }
 
   /// @notice Perform the actual borrow.
   /// @dev msg.sender borrow "_amount" of FLAT and transfer to "_to"
   /// @param _to The address to received borrowed FLAT
   /// @param _amount The amount of FLAT to be borrowed
-  function _borrow(address _to, uint256 _amount) internal returns (uint256 _debtShare, uint256 _share) {
+  function _borrow(address _to, uint256 _amount) internal checkDebtSize returns (uint256 _debtShare, uint256 _share) {
     // 1. Find out debtShare from the give "_value" that msg.sender wish to borrow
     _debtShare = debtValueToShare(_amount);
 
@@ -240,7 +266,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     returns (uint256 _debtShare, uint256 _share)
   {
     // 1. Borrow FLAT
-    (_debtShare, _share) = _borrow(_to, _borrowAmount);
+    (_debtShare, _share) = _borrow(msg.sender, _borrowAmount);
 
     // 2. Withdraw FLAT from Clerk to "_to"
     _vaultWithdraw(flat, _to, _borrowAmount, 0);
@@ -325,13 +351,13 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     uint256 _maxPrice
   ) external nonReentrant accrue updateCollateralPriceWithSlippageCheck(_minPrice, _maxPrice) checkSafe {
     // 1. Deposit collateral to the Vault
-    (, uint256 _shareOut) = _vaultDeposit(collateral, _to, _collateralAmount, 0);
+    (, uint256 _shareOut) = _vaultDeposit(collateral, msg.sender, _collateralAmount, 0);
 
     // 2. Add collateral
-    _addCollateral(_to, _shareOut);
+    _addCollateral(msg.sender, _shareOut);
 
     // 3. Borrow FLAT
-    _borrow(_to, _borrowAmount);
+    _borrow(msg.sender, _borrowAmount);
 
     // 4. Withdraw FLAT from Vault to "_to"
     _vaultWithdraw(flat, _to, _borrowAmount, 0);
@@ -356,14 +382,12 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
   /// @notice Deposit "_debtValue" FLAT to the vault, repay the debt, and withdraw "_collateralAmount" of collateral.
   /// @dev source of funds to repay debt will come from msg.sender, "_to" is beneficiary
-  /// @param _for The address to repay debt for.
   /// @param _to The address to received collateral token.
   /// @param _maxDebtReturn The maxium amount of FLAT to be return.
   /// @param _collateralAmount The amount of collateral to be withdrawn.
   /// @param _minPrice Minimum price to allow the repayment.
   /// @param _maxPrice Maximum price to allow the replayment.
   function depositRepayAndWithdraw(
-    address _for,
     address _to,
     uint256 _maxDebtReturn,
     uint256 _collateralAmount,
@@ -371,13 +395,13 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     uint256 _maxPrice
   ) external nonReentrant accrue updateCollateralPriceWithSlippageCheck(_minPrice, _maxPrice) checkSafe {
     // 1. Find out how much debt to repaid
-    uint256 _debtValue = MathUpgradeable.min(_maxDebtReturn, debtShareToValue(userDebtShare[_to]));
+    uint256 _debtValue = MathUpgradeable.min(_maxDebtReturn, debtShareToValue(userDebtShare[msg.sender]));
 
     // 2. Deposit FLAT to Vault for preparing to settle the debt
     _vaultDeposit(flat, msg.sender, _debtValue, 0);
 
     // 3. Repay the debt
-    _repay(_for, _debtValue);
+    _repay(msg.sender, _debtValue);
 
     // 4. Remove collateral from FlatMarket to "_to"
     uint256 _collateralShare = clerk.toShare(collateral, _collateralAmount, false);
@@ -397,94 +421,29 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     address _to,
     IFlashLiquidateStrategy _flashLiquidateStrategy
   ) public nonReentrant accrue {
-    // 1. Load required config
+    // 1. Prepare variables
     uint256 _liquidationPenalty = marketConfig.liquidationPenalty(address(this));
     uint256 _liquidationTreasuryBps = marketConfig.liquidationTreasuryBps(address(this));
     require(_liquidationPenalty <= 19000 && _liquidationPenalty >= 10000, "bad liquidation penalty");
     require(_liquidationTreasuryBps <= 2000 && _liquidationTreasuryBps >= 500, "bad liquidation treasury bps");
     require(marketConfig.treasury() != address(0), "bad treasury");
+    require(_users.length == _maxDebtShares.length, "invalid a user length comparing to maxDebtShares");
 
-    // 2. Force update collateral price
-    (, uint256 _collateralPrice) = updateCollateralPrice();
+    (uint256 _sumCollateralShare, uint256 _sumDebtAmount, uint256 _sumDebtShare) = _prepareLiquidates(
+      _users,
+      _maxDebtShares,
+      _to
+    );
 
-    // 3. Prepare variables
-    uint256 _sumCollateralShare = 0;
-    uint256 _sumDebtAmount = 0;
-    uint256 _sumDebtShare = 0;
-    Conversion memory _clerkTotals = clerk.totals(collateral);
-
-    // 4. Loop-through all users to check if we are able to liquidate
-    for (uint256 i = 0; i < _users.length; i++) {
-      address _user = _users[i];
-      // 4.1. If user position not safe, then can liquidate
-      if (!_checkSafe(_user, _collateralPrice)) {
-        // 4.1.1. Findout how much debt share to liquidate
-        uint256 _lessDebtShare = MathUpgradeable.min(_maxDebtShares[i], userDebtShare[_user]);
-        // 4.1.2. Convert debt share to FLAT value
-        uint256 _borrowAmount = debtShareToValue(_lessDebtShare);
-        // 4.1.3. Calculate collateral share to be taken out by liquidator
-        uint256 _collateralShare = _clerkTotals.toShare(
-          (_borrowAmount * _liquidationPenalty * COLLATERAL_PRICE_PRECISION) / (BPS_PRECISION * _collateralPrice),
-          false
-        );
-
-        // 4.1.4. If the value of leftover collateral less than minDebtSize then liquidator should take all
-        // Need to recalculate _lessDebtShare and _borrowAmount as well.
-        if (
-          _collateralShare > userCollateralShare[_user] ||
-          ((_clerkTotals.toAmount(userCollateralShare[_user] - _collateralShare, false) * _collateralPrice) /
-            COLLATERAL_PRICE_PRECISION) <
-          marketConfig.minDebtSize(address(this))
-        ) {
-          // Take out all collateral
-          _collateralShare = userCollateralShare[_user];
-          userCollateralShare[_user] = 0;
-
-          // Recalculate borrowAmount & lessDebtShare
-          // borrowAmount should be discounted instead of discount on collateral.
-          // Round debtShare up to make sure it is not zero if borrowAmount is tiny.
-          _borrowAmount =
-            (clerk.toAmount(collateral, _collateralShare, false) * _collateralPrice * BPS_PRECISION) /
-            (COLLATERAL_PRICE_PRECISION * _liquidationPenalty);
-          _lessDebtShare = debtValueToShare(_borrowAmount);
-        } else {
-          userCollateralShare[_user] = userCollateralShare[_user] - _collateralShare;
-        }
-
-        // Update userDebtShare
-        userDebtShare[_user] = userDebtShare[_user] - _lessDebtShare;
-
-        emit LogRemoveCollateral(_user, _to, _collateralShare);
-        emit LogRepay(msg.sender, _user, _borrowAmount, _lessDebtShare);
-
-        // 4.1.5. If user's collateral is 0, but debtShare is not 0;
-        // Then it is bad debt. Hence move user's debt share to treasury.
-        // Treausry will settle bad debt later by surplus or liquidation fee
-        if (userCollateralShare[_user] == 0 && userDebtShare[_user] != 0) {
-          uint256 _badDebtValue = debtShareToValue(userDebtShare[_user]);
-          totalDebtShare = totalDebtShare - userDebtShare[_user];
-          totalDebtValue = totalDebtValue - _badDebtValue;
-          userDebtShare[_user] = 0;
-          // call an `onBadDebt` call back so that the treasury would know if this market has a bad debt
-          ITreasuryHolderCallback(marketConfig.treasury()).onBadDebt(_badDebtValue);
-        }
-
-        // 4.1.6. Update total vairables
-        _sumCollateralShare = _sumCollateralShare + _collateralShare;
-        _sumDebtAmount = _sumDebtAmount + _borrowAmount;
-        _sumDebtShare = _sumDebtShare + _lessDebtShare;
-      }
-    }
-
-    // 5. Revert if all users are safe
+    // 2. Revert if all users are safe
     require(_sumDebtAmount != 0, "all healthy");
 
-    // 6. Update market global states
+    // 3. Update market global states
     totalDebtValue = totalDebtValue - _sumDebtAmount;
     totalDebtShare = totalDebtShare - _sumDebtShare;
     totalCollateralShare = totalCollateralShare - _sumCollateralShare;
 
-    // 7. Take out treasury fee on liquidation
+    // 4. Take out treasury fee on liquidation
     {
       uint256 _distributionAmount = ((((_sumDebtAmount * _liquidationPenalty) / BPS_PRECISION) - _sumDebtAmount) *
         _liquidationTreasuryBps) / BPS_PRECISION;
@@ -492,17 +451,179 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
       liquidationFee = liquidationFee + _distributionAmount;
     }
 
-    // 8. Convert liquidatable amount to share
+    // 5. Convert liquidatable amount to share
     uint256 _allBorrowShare = clerk.toShare(flat, _sumDebtAmount, true);
 
-    // 9. Transfer collateral to liquidator
-    clerk.transfer(collateral, address(this), _to, _sumCollateralShare);
+    // 6. Transfer collateral to liquidator
     if (address(_flashLiquidateStrategy) != address(0)) {
-      // 9.1. If flash liquidate strategy is set, then call the strategy
+      // 6.1. If flash liquidate strategy is set, then call the strategy
       _flashLiquidateStrategy.execute(collateral, flat, msg.sender, _allBorrowShare, _sumCollateralShare);
     }
-    // 10. Debit FLAT from liquidator, if liquidator doesn't has enough FLAT, then it should revert
+    // 7. Debit FLAT from liquidator, if liquidator doesn't has enough FLAT, then it should revert
     clerk.transfer(flat, msg.sender, address(this), _allBorrowShare);
+  }
+
+  /// @dev batch prepare liquidate
+  /// @param _users An array of user addresses.
+  /// @param _maxDebtShares A one-to-one mapping to `users`, contains maximum (partial) borrow amounts (to liquidate) of the respective user.
+  /// @param _to Address of the receiver in open liquidations
+  /// @return _sumCollateralShare result of prepare liquidates
+  /// @return _sumDebtAmount result of prepare liquidates
+  /// @return _sumDebtShare result of prepare liquidates
+  function _prepareLiquidates(
+    address[] calldata _users,
+    uint256[] calldata _maxDebtShares,
+    address _to
+  )
+    internal
+    returns (
+      uint256 _sumCollateralShare,
+      uint256 _sumDebtAmount,
+      uint256 _sumDebtShare
+    )
+  {
+    uint256 _liquidationPenalty = marketConfig.liquidationPenalty(address(this));
+
+    // 1. Force update collateral price
+    (, uint256 _collateralPrice) = updateCollateralPrice();
+
+    // 2. Loop-through all users to check if we are able to liquidate
+    Conversion memory _clerkTotals = clerk.totals(collateral);
+
+    for (uint256 i = 0; i < _users.length; i++) {
+      address _user = _users[i];
+      uint256 _maxUserDebtShare = _maxDebtShares[i];
+      // 2.1. If user position is safe, skip, otherwise can liquidate
+      if (_checkSafe(_user, _collateralPrice)) continue;
+      // 2.3 prepare liquidate
+      (uint256 _collateralShare, uint256 _borrowAmount, uint256 _lessDebtShare) = _prepareLiquidate(
+        _user,
+        _to,
+        _clerkTotals,
+        _collateralPrice,
+        _maxUserDebtShare,
+        _liquidationPenalty
+      );
+
+      // 2.4 Update total vairables
+      _sumCollateralShare = _sumCollateralShare + _collateralShare;
+      _sumDebtAmount = _sumDebtAmount + _borrowAmount;
+      _sumDebtShare = _sumDebtShare + _lessDebtShare;
+    }
+  }
+
+  /// @dev prepare liquidation statement, need to separate the function to avoid stack-too-deep error
+  function _prepareLiquidate(
+    address _user,
+    address _to,
+    Conversion memory _clerkTotals,
+    uint256 _collateralPrice,
+    uint256 _maxUserDebtShare,
+    uint256 _liquidationPenalty
+  )
+    internal
+    returns (
+      uint256 _collateralShare,
+      uint256 _borrowAmount,
+      uint256 _lessDebtShare
+    )
+  {
+    // 1. repay debt
+    (_collateralShare, _borrowAmount, _lessDebtShare) = _repay(
+      _user,
+      _clerkTotals,
+      _collateralPrice,
+      _maxUserDebtShare,
+      _liquidationPenalty
+    );
+    // 2. callback to treasury contract (for settling bad debts)
+    _treasuryCallback(_user);
+
+    // 3. transfer a collateral share back to _to specified by liquidator
+    _transferCollateralShare(_user, _to, _collateralShare);
+  }
+
+  /// @dev repay debt
+  /// @param _user user address
+  /// @param _clerkTotals collateral share and amount
+  /// @param _collateralPrice current collateral price
+  /// @param _maxUserDebtShare maximum debt share to be repaid
+  /// @param _liquidationPenalty liquidation penalty
+  function _repay(
+    address _user,
+    Conversion memory _clerkTotals,
+    uint256 _collateralPrice,
+    uint256 _maxUserDebtShare,
+    uint256 _liquidationPenalty
+  )
+    internal
+    returns (
+      uint256 _collateralShare,
+      uint256 _borrowAmount,
+      uint256 _lessDebtShare
+    )
+  {
+    uint256 _closeFactorBps = marketConfig.closeFactorBps(address(this));
+    // 1. Findout how much debt share to liquidate
+    _lessDebtShare = MathUpgradeable.min(_maxUserDebtShare, (userDebtShare[_user] * _closeFactorBps) / BPS_PRECISION);
+    // 2. Convert debt share to FLAT value
+    _borrowAmount = debtShareToValue(_lessDebtShare);
+    // 3. Calculate collateral share to be taken out by liquidator
+    _collateralShare = _clerkTotals.toShare(
+      (_borrowAmount * _liquidationPenalty * COLLATERAL_PRICE_PRECISION) / (BPS_PRECISION * _collateralPrice),
+      false
+    );
+
+    // 4. If the value of leftover collateral less than minDebtSize then liquidator should take all
+    // Need to recalculate _lessDebtShare and _borrowAmount as well.
+    if (
+      _collateralShare > userCollateralShare[_user] ||
+      ((_clerkTotals.toAmount(userCollateralShare[_user] - _collateralShare, false) * _collateralPrice) /
+        COLLATERAL_PRICE_PRECISION) <
+      marketConfig.minDebtSize(address(this))
+    ) {
+      // Take out all collateral
+      _collateralShare = userCollateralShare[_user];
+      userCollateralShare[_user] = 0;
+
+      // Recalculate borrowAmount & lessDebtShare
+      // borrowAmount should be discounted instead of discount on collateral.
+      // Round debtShare up to make sure it is not zero if borrowAmount is tiny.
+      _borrowAmount =
+        (clerk.toAmount(collateral, _collateralShare, false) * _collateralPrice * BPS_PRECISION) /
+        (COLLATERAL_PRICE_PRECISION * _liquidationPenalty);
+      _lessDebtShare = debtValueToShare(_borrowAmount);
+    } else {
+      userCollateralShare[_user] = userCollateralShare[_user] - _collateralShare;
+    }
+
+    // Update userDebtShare
+    userDebtShare[_user] = userDebtShare[_user] - _lessDebtShare;
+    emit LogRepay(msg.sender, _user, _borrowAmount, _lessDebtShare);
+  }
+
+  /// @dev during a bad debt, need to notify a treasudy holder `onBadDebt` function to update the bad debt
+  /// @dev separate to prevent stack-too-deep error
+  function _treasuryCallback(address _user) internal {
+    if (userCollateralShare[_user] == 0 && userDebtShare[_user] != 0) {
+      uint256 _badDebtValue = debtShareToValue(userDebtShare[_user]);
+      totalDebtShare = totalDebtShare - userDebtShare[_user];
+      totalDebtValue = totalDebtValue - _badDebtValue;
+      userDebtShare[_user] = 0;
+      // call an `onBadDebt` call back so that the treasury would know if this market has a bad debt
+      ITreasuryHolderCallback(marketConfig.treasury()).onBadDebt(_badDebtValue);
+    }
+  }
+
+  /// @notice transfer collateral share to _to
+  /// @dev separate to prevent stack-too-deep error
+  function _transferCollateralShare(
+    address _from,
+    address _to,
+    uint256 _collateralShare
+  ) internal {
+    clerk.transfer(collateral, _from, _to, _collateralShare);
+    emit LogRemoveCollateral(_from, _to, _collateralShare);
   }
 
   /// @notice Reduce the supply of FLAT
@@ -521,7 +642,9 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     userCollateralShare[msg.sender] = userCollateralShare[msg.sender] - _share;
     totalCollateralShare = totalCollateralShare - _share;
 
-    clerk.transfer(collateral, address(this), _to, _share);
+    if (msg.sender != _to) {
+      clerk.transfer(collateral, msg.sender, _to, _share);
+    }
 
     emit LogRemoveCollateral(msg.sender, _to, _share);
   }
@@ -561,7 +684,7 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
   /// @notice Perform the actual repay.
   /// @param _for The address to repay debt.
   /// @param _debtValue The debt value to be repaid.
-  function _repay(address _for, uint256 _debtValue) internal returns (uint256 _debtShare) {
+  function _repay(address _for, uint256 _debtValue) internal checkDebtSize returns (uint256 _debtShare) {
     // 1. Findout "_debtShare" from the given "_debtValue"
     _debtShare = debtValueToShare(_debtValue);
 
@@ -627,6 +750,15 @@ contract FlatMarket is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     uint256 _amount,
     uint256 _share
   ) internal returns (uint256, uint256) {
+    uint256 share_ = _amount > 0 ? clerk.toShare(_token, _amount, true) : _share;
+    require(_token == collateral || _token == flat, "invalid token to be withdrawn");
+    if (_token == collateral) {
+      require(
+        clerk.balanceOf(_token, msg.sender) - share_ >= userCollateralShare[msg.sender],
+        "please exclude the collateral"
+      );
+    }
+
     return clerk.withdraw(_token, msg.sender, _to, _amount, _share);
   }
 

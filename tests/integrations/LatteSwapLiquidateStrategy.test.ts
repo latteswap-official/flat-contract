@@ -2,11 +2,17 @@ import { ethers, waffle } from "hardhat";
 import chai from "chai";
 import { solidity } from "ethereum-waffle";
 import { latteSwapLiquidationStrategyIntegrationTestFixture } from "../helpers";
-import { Clerk, LatteSwapLiquidationStrategy, SimpleToken } from "../../typechain/v8";
+import {
+  Clerk,
+  LatteSwapLiquidationStrategy,
+  MockFlatMarketForLatteSwapLiquidationStrategy,
+  SimpleToken,
+} from "../../typechain/v8";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { BigNumber } from "ethers";
+import { BaseContract, BigNumber } from "ethers";
 import { deploy } from "@openzeppelin/hardhat-upgrades/dist/utils";
 import { LatteSwapFactory, LatteSwapPair, LatteSwapRouter } from "../../typechain/v6";
+import { FakeContract, MockContract } from "@defi-wonderland/smock";
 
 chai.use(solidity);
 const { expect } = chai;
@@ -28,6 +34,9 @@ let lp: LatteSwapPair;
 let deployer: SignerWithAddress;
 let alice: SignerWithAddress;
 let bob: SignerWithAddress;
+let flatMarket: MockFlatMarketForLatteSwapLiquidationStrategy;
+let flatMarketConfig: FakeContract<BaseContract>;
+let compositeOracle: FakeContract<BaseContract>;
 
 describe("LatteSwapLiquidateStrategy", () => {
   beforeEach(async () => {
@@ -45,39 +54,35 @@ describe("LatteSwapLiquidateStrategy", () => {
       reserve1,
       lp,
       reserveFlat,
+      flatMarket,
+      flatMarketConfig,
+      compositeOracle,
     } = await waffle.loadFixture(latteSwapLiquidationStrategyIntegrationTestFixture));
   });
 
   describe("#execute()", () => {
     it("should be able to swap tokens", async () => {
+      await clerk.whitelistMarket(flatMarket.address, true);
       // deployer deposit some money to clerk for liquidation strategy, making it able to swap
       const lpBalance = await lp.balanceOf(await deployer.getAddress());
-
       await lp.approve(clerk.address, lpBalance);
-
-      await clerk.deposit(lp.address, await deployer.getAddress(), latteSwapLiquidationStrategy.address, lpBalance, 0);
-
+      await flatMarket.deposit(lp.address, latteSwapLiquidationStrategy.address, lpBalance);
       const removedBalanceT0 = reserve0.mul(lpBalance).div(await lp.totalSupply());
       const removedBalanceT1 = reserve1.mul(lpBalance).div(await lp.totalSupply());
-
       const token0FlatAmountOut = await router.getAmountOut(removedBalanceT0, reserve0, reserveFlat);
       const token1FlatAmountOut = await router.getAmountOut(removedBalanceT1, reserve1, reserveFlat);
-
       await expect(
-        latteSwapLiquidationStrategy.execute(
-          lp.address,
-          flat.address,
+        flatMarket.executeLiquidationStrategy(
+          latteSwapLiquidationStrategy.address,
           await alice.getAddress(),
           token0FlatAmountOut.add(token1FlatAmountOut),
           lpBalance
         )
       ).to.reverted;
-
       await latteSwapLiquidationStrategy.setPathToFlat(token0.address, [token0.address, flat.address]);
       await latteSwapLiquidationStrategy.setPathToFlat(token1.address, [token1.address, flat.address]);
-      await latteSwapLiquidationStrategy.execute(
-        lp.address,
-        flat.address,
+      await flatMarket.executeLiquidationStrategy(
+        latteSwapLiquidationStrategy.address,
         await alice.getAddress(),
         token0FlatAmountOut.add(token1FlatAmountOut),
         lpBalance

@@ -16,13 +16,12 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   */
   const deployer = (await ethers.getSigners())[0];
   const config = getConfig();
-  const WBNB = config.Tokens.WBNB;
 
   await withNetworkFile(async () => {
     console.log(`deploying a Clerk`);
 
     const Clerk = (await ethers.getContractFactory("Clerk", deployer)) as Clerk__factory;
-    const clerk = (await upgrades.deployProxy(Clerk, [WBNB])) as Clerk;
+    const clerk = (await upgrades.deployProxy(Clerk, [])) as Clerk;
 
     await clerk.deployed();
     console.log(`>> Deployed at ${clerk.address}`);

@@ -38,6 +38,7 @@ interface IClerk {
   event LogStrategyProfit(IERC20Upgradeable indexed token, uint256 amount);
   event LogStrategyLoss(IERC20Upgradeable indexed token, uint256 amount);
   event LogWhiteListMarket(address indexed market, bool approved);
+  event LogTokenToMarkets(address indexed market, address indexed token, bool approved);
 
   function balanceOf(IERC20Upgradeable, address) external view returns (uint256);
 
@@ -47,7 +48,7 @@ interface IClerk {
     address to,
     uint256 amount,
     uint256 share
-  ) external payable returns (uint256 amountOut, uint256 shareOut);
+  ) external returns (uint256 amountOut, uint256 shareOut);
 
   function harvest(IERC20Upgradeable token) external;
 
@@ -59,14 +60,7 @@ interface IClerk {
 
   function strategy(IERC20Upgradeable) external view returns (IStrategy);
 
-  function strategyData(IERC20Upgradeable)
-    external
-    view
-    returns (
-      uint64 strategyStartDate,
-      uint64 targetBps,
-      uint128 balance
-    );
+  function strategyData(IERC20Upgradeable) external view returns (uint64 targetBps, uint128 balance);
 
   function toAmount(
     IERC20Upgradeable token,
