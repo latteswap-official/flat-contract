@@ -15,7 +15,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
   const deployer = (await ethers.getSigners())[0];
-  const MINT_RANGE = 6 * 60 * 60; // 6 hrs
+  const MINT_RANGE = 6 * 60 * 60; // 6 hours
   const MAX_MINT_BPS = 1500;
 
   await withNetworkFile(async () => {

@@ -25,10 +25,11 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
   const deployer = (await ethers.getSigners())[0];
+  const config = getConfig();
   const PARAM = {
-    TREASURY_ACCOUNT: await deployer.getAddress(),
-    CLERK: "0xBf181131D87B2a7720d2Dd5095f9eCaA456bd735",
-    FLAT: "0x0950F9553e02B0d0cCb1Eb76E71B7Abf7E3AB7c2",
+    TREASURY_ACCOUNT: "0x8C6Dd14ef0e41037b5e87C7b93438837f6D8D1D2",
+    CLERK: config.Clerk,
+    FLAT: config.FLAT,
   };
 
   await withNetworkFile(async () => {

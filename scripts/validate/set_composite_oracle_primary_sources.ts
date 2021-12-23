@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { BigNumberish, constants } from "ethers";
 import { ethers, network } from "hardhat";
 import { CompositeOracle__factory } from "../../typechain/v8";
-import { withNetworkFile, getConfig } from "../../utils";
+import { withNetworkFile, getConfig, IProdConfig } from "../../utils";
 
 interface ISetCompositeOraclePrimarySourcesParam {
   TOKEN: string;
@@ -22,15 +22,20 @@ async function main() {
   Check all variables below before execute the deployment script
   */
   const deployer = (await ethers.getSigners())[0];
-  const COMPOSITE_ORACLE = "0x554F4Ed695D801B2c2cceC0a9927977C264A50fb";
+  const config = getConfig() as IProdConfig;
+  const COMPOSITE_ORACLE = config.Oracle.Composite;
   const PARAM: ISetCompositeOraclePrimarySourcesParam = {
-    TOKEN: "0xDa01147B87d389d1BDB3c2dD28bf56c79BE74E3c",
-    MAX_DEVIATION: ethers.utils.parseEther("1.5"),
-    ORACLE: ["0x8474BE3314EDD429993B4948f3c5059F124139E8"],
+    TOKEN: "0x318B894003D0EAcfEDaA41B8c70ed3CE1Fde1450",
+    MAX_DEVIATION: ethers.utils.parseEther("1.05"),
+    ORACLE: [config.Oracle.Chainlink, config.Oracle.OffChain],
     ORACLE_DATA: [
       ethers.utils.defaultAbiCoder.encode(
+        ["address", "address", "uint256"],
+        [config.ChainlinkAggregator["USDT-BUSD"], constants.AddressZero, ethers.utils.parseUnits("1", 36)]
+      ),
+      ethers.utils.defaultAbiCoder.encode(
         ["address", "address"],
-        ["0x1524C3380257eF5D556AFeB6056c35DeFA9db8b6", constants.AddressZero]
+        ["0x318B894003D0EAcfEDaA41B8c70ed3CE1Fde1450", constants.AddressZero]
       ),
     ],
   };
