@@ -1,10 +1,12 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import { ethers, upgrades } from "hardhat";
-import { FLAT, FLAT__factory } from "../../typechain/v8";
-import { withNetworkFile } from "../../utils";
+import { OffChainOracle, OffChainOracle__factory } from "../../typechain/v8";
+import { getConfig, IDevelopConfig, withNetworkFile } from "../../utils";
+import { constants } from "ethers";
+import { expect } from "chai";
 
-const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+const main = async () => {
   /*
   ░██╗░░░░░░░██╗░█████╗░██████╗░███╗░░██╗██╗███╗░░██╗░██████╗░
   ░██║░░██╗░░██║██╔══██╗██╔══██╗████╗░██║██║████╗░██║██╔════╝░
@@ -15,22 +17,20 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
   const deployer = (await ethers.getSigners())[0];
-  const MINT_RANGE = 6 * 60 * 60; // 6 hours
-  const MAX_MINT_BPS = 1500;
+  const config = getConfig();
+  const OFFCHAIN_ORACLE = "0xb9ed72e920A04815db745bFd802f3134658a6D8d";
+  const FEEDER = "0x3eEa288a952d76e7CC7b391360eDAD7d55CccEBd";
 
-  await withNetworkFile(async () => {
-    console.log(
-      `deploying a FLAT with mint range equals ${MINT_RANGE / 60 / 60} hrs and max mint bps of ${MAX_MINT_BPS} `
-    );
+  const offchainOracle = OffChainOracle__factory.connect(OFFCHAIN_ORACLE, deployer);
 
-    const Flat = (await ethers.getContractFactory("FLAT", deployer)) as FLAT__factory;
-    const flat = (await upgrades.deployProxy(Flat, [MINT_RANGE, MAX_MINT_BPS])) as FLAT;
-
-    await flat.deployed();
-    console.log(`>> Deployed at ${flat.address}`);
-    console.log("✅ Done deploying a FLAT");
-  });
+  console.log(`>> expect offchain oracle to set feeder role to ${FEEDER}`);
+  expect(await offchainOracle.hasRole(await offchainOracle.FEEDER_ROLE(), FEEDER)).to.be.true;
+  console.log(">> ✅ DONE");
 };
 
-export default func;
-func.tags = ["DeployFLAT"];
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });

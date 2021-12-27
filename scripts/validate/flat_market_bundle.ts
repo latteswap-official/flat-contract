@@ -27,21 +27,21 @@ const main = async () => {
   */
   const deployer = (await ethers.getSigners())[0];
   const config = getConfig();
-  const FLAT_MARKET_CONFIG = "0x7466D00b6EB69a62F1B2aDcbD8415367FaCBFBe3";
+  const FLAT_MARKET_CONFIG = config.FlatMarketConfig;
   const PARAM = {
-    FLAT_MARKET: "0xe665686FE7e7fe00c69B74737FA4CDe78aaFCc3B",
+    FLAT_MARKET: "0x92E357dBFC3A09558E8C44C66555D04982Ec3C29",
     // market params
-    CLERK: "0xBf181131D87B2a7720d2Dd5095f9eCaA456bd735",
+    CLERK: config.Clerk,
     FLAT: config.FLAT,
-    COLLATERAL_TOKEN: "0xDa01147B87d389d1BDB3c2dD28bf56c79BE74E3c",
-    ORACLE: "0x554F4Ed695D801B2c2cceC0a9927977C264A50fb",
-    ORACLE_DATA: ethers.utils.defaultAbiCoder.encode(["address"], ["0xDa01147B87d389d1BDB3c2dD28bf56c79BE74E3c"]),
+    COLLATERAL_TOKEN: "0x7EFaEf62fDdCCa950418312c6C91Aef321375A00",
+    ORACLE: config.Oracle.Composite,
+    ORACLE_DATA: ethers.utils.defaultAbiCoder.encode(["address"], ["0x7EFaEf62fDdCCa950418312c6C91Aef321375A00"]),
     // config params
-    COLLATERAL_FACTOR: "9000",
+    COLLATERAL_FACTOR: "8000",
     LIQUIDATION_PENALTY: "10500",
-    LIQUIDATION_TREASURY_BPS: "500",
-    MIN_DEBT_SIZE: ethers.utils.parseEther("5"), // 5 FLAT
-    INTEREST_PER_SECOND: "100000000",
+    LIQUIDATION_TREASURY_BPS: "8000",
+    MIN_DEBT_SIZE: ethers.utils.parseEther("500"), // 500 FLAT
+    INTEREST_PER_SECOND: "792744799",
     CLOSE_FACTOR_BPS: "5000",
   };
 

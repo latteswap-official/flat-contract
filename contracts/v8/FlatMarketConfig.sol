@@ -22,7 +22,7 @@ contract FlatMarketConfig is IFlatMerketConfig, OwnableUpgradeable {
     uint64 _collateralFactor,
     uint64 _liquidationPenalty,
     uint64 _liquidationTreasuryBps,
-    uint64 _minDebtSize,
+    uint256 _minDebtSize,
     uint256 _interestPerSecond,
     uint64 _closeFactorBps
   );
@@ -32,7 +32,7 @@ contract FlatMarketConfig is IFlatMerketConfig, OwnableUpgradeable {
     uint64 collateralFactor;
     uint64 liquidationPenalty;
     uint64 liquidationTreasuryBps;
-    uint64 minDebtSize;
+    uint256 minDebtSize;
     uint64 closeFactorBps;
     uint256 interestPerSecond;
   }
@@ -104,7 +104,7 @@ contract FlatMarketConfig is IFlatMerketConfig, OwnableUpgradeable {
         "bad liquidityPenalty"
       );
       require(
-        _configs[i].liquidationTreasuryBps >= 500 && _configs[i].liquidationTreasuryBps <= 2000,
+        _configs[i].liquidationTreasuryBps >= 500 && _configs[i].liquidationTreasuryBps <= 8000,
         "bad liquidationTreasuryBps"
       );
       require(_configs[i].closeFactorBps <= 10000, "bad closeFactorBps");

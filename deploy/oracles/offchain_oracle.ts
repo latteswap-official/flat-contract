@@ -15,7 +15,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   Check all variables below before execute the deployment script
   */
   const deployer = (await ethers.getSigners())[0];
-  const FEEDER = "0x29D60B7DE99E00b715309Fd1CbfF3C29F232dd8E";
+  const FEEDER = "0x3eEa288a952d76e7CC7b391360eDAD7d55CccEBd";
 
   await withNetworkFile(async () => {
     console.log(`>> deploying an OffChainOracle`);
