@@ -31,8 +31,6 @@ interface IClerk {
   );
   event LogTransfer(IERC20Upgradeable indexed token, address indexed from, address indexed to, uint256 share);
   event LogStrategyTargetBps(IERC20Upgradeable indexed token, uint256 targetBps);
-  event LogStrategyQueued(IERC20Upgradeable indexed token, IStrategy indexed strategy);
-  event LogStrategySet(IERC20Upgradeable indexed token, IStrategy indexed strategy);
   event LogStrategyDeposit(IERC20Upgradeable indexed token, uint256 amount);
   event LogStrategyWithdraw(IERC20Upgradeable indexed token, uint256 amount);
   event LogStrategyProfit(IERC20Upgradeable indexed token, uint256 amount);
