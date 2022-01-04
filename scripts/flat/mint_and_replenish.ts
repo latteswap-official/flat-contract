@@ -55,7 +55,7 @@ async function main() {
       SHOULD_REPLENISH: true,
       PARAM: [
         {
-          MARKET: config.FlatMarket["USDT-BUSD"],
+          MARKET: config.FlatMarket["BNB-BUSD"],
           AMOUNT: ethers.utils.parseEther("250000"),
         },
       ],

@@ -32,7 +32,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const PARAMS: ILatteSwapYieldStrategyParams = [
     {
       BOOSTER: config.Booster,
-      STAKING_TOKEN: "0x318B894003D0EAcfEDaA41B8c70ed3CE1Fde1450",
+      STAKING_TOKEN: "0xBD4284d34b9673FC79aAb2C0080C5A19b4282425",
       CLERK: config.Clerk,
       TREASURY_ACCOUNT: "0xC29d5eB3d4baBa9b23753B00b8F048ec0431E358",
       TREASURY_FEE_BPS: "700",

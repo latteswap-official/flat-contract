@@ -18,9 +18,9 @@ const main = async () => {
   */
   const deployer = (await ethers.getSigners())[0];
   const config = getConfig();
-  const LATTESWAP_YIELD_STRATEGY = "0xF81D47Fc441201ec26e36af4Ee8768828b4651Ef";
+  const LATTESWAP_YIELD_STRATEGY = "0x758A0C5C032285F004d514Cc1D5Ca155C7b9dbbE";
   const BOOSTER = config.Booster;
-  const STAKING_TOKEN = "0x318B894003D0EAcfEDaA41B8c70ed3CE1Fde1450";
+  const STAKING_TOKEN = "0xBD4284d34b9673FC79aAb2C0080C5A19b4282425";
   const CLERK = config.Clerk;
   const TREASURY_ACCOUNT = "0xC29d5eB3d4baBa9b23753B00b8F048ec0431E358";
   const TREASURY_FEE_BPS = "700";
