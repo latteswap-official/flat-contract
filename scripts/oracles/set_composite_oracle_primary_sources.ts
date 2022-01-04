@@ -34,17 +34,17 @@ async function main() {
   const COMPOSITE_ORACLE = config.Oracle.Composite;
   const PARAMS: ISetCompositeOraclePrimarySourcesParams = [
     {
-      TOKEN: "0x7EFaEf62fDdCCa950418312c6C91Aef321375A00",
+      TOKEN: "0xF45cd219aEF8618A92BAa7aD848364a158a24F33",
       MAX_DEVIATION: ethers.utils.parseEther("1.05"),
       ORACLE: [config.Oracle.Chainlink, config.Oracle.OffChain],
       ORACLE_DATA: [
         ethers.utils.defaultAbiCoder.encode(
           ["address", "address", "uint256"],
-          [config.ChainlinkAggregator["PCS_USDT-BUSD"], constants.AddressZero, ethers.utils.parseUnits("1", 36)]
+          [config.ChainlinkAggregator["PCS_BTCB-BUSD"], constants.AddressZero, ethers.utils.parseUnits("1", 36)]
         ),
         ethers.utils.defaultAbiCoder.encode(
           ["address", "address"],
-          ["0x7EFaEf62fDdCCa950418312c6C91Aef321375A00", constants.AddressZero]
+          ["0xF45cd219aEF8618A92BAa7aD848364a158a24F33", constants.AddressZero]
         ),
       ],
     },

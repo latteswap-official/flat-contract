@@ -29,15 +29,15 @@ const main = async () => {
   const config = getConfig();
   const FLAT_MARKET_CONFIG = config.FlatMarketConfig;
   const PARAM = {
-    FLAT_MARKET: "0x92E357dBFC3A09558E8C44C66555D04982Ec3C29",
+    FLAT_MARKET: "0x8f64D47b98c67fDA885860B611673669aF90B62E",
     // market params
     CLERK: config.Clerk,
     FLAT: config.FLAT,
-    COLLATERAL_TOKEN: "0x7EFaEf62fDdCCa950418312c6C91Aef321375A00",
+    COLLATERAL_TOKEN: "0xF45cd219aEF8618A92BAa7aD848364a158a24F33",
     ORACLE: config.Oracle.Composite,
-    ORACLE_DATA: ethers.utils.defaultAbiCoder.encode(["address"], ["0x7EFaEf62fDdCCa950418312c6C91Aef321375A00"]),
+    ORACLE_DATA: ethers.utils.defaultAbiCoder.encode(["address"], ["0xF45cd219aEF8618A92BAa7aD848364a158a24F33"]),
     // config params
-    COLLATERAL_FACTOR: "8000",
+    COLLATERAL_FACTOR: "7000",
     LIQUIDATION_PENALTY: "10500",
     LIQUIDATION_TREASURY_BPS: "8000",
     MIN_DEBT_SIZE: ethers.utils.parseEther("500"), // 500 FLAT
