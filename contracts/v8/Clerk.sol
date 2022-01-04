@@ -47,7 +47,7 @@ contract Clerk is IClerk, OwnableUpgradeable {
   }
 
   uint256 private constant FLASH_LOAN_FEE = 50; // 0.05%
-  uint256 private constant FLASH_LOAN_FEE_PRECISION = 1e5;
+  uint256 private constant FLASH_LOAN_FEE_PRECISION = 1e5; // 100% for flash loan fee precision
   uint256 private constant MAX_TARGET_BPS = 10000; // 100%
   uint256 private constant MINIMUM_SHARE_BALANCE = 1000; // To prevent the ratio going off from tiny share
 
